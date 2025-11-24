@@ -1,0 +1,355 @@
+
+import { Item, ItemSlot, Rarity, StatType, ItemStat, Monster, BaseAttributes, PassiveSkill, PlayerStats, EquipmentMap, ActiveEffect, PassiveTheme, MonsterRarity, MaledictAffix } from '../types';
+import { PASSIVE_SKILLS_POOL, PASSIVE_SET_BONUSES, COMPOSITE_SYNERGIES, MALEDICT_AFFIXES } from '../constants';
+import { BALANCE } from './gameBalance';
+import { IconName } from '../components/GameIcon';
+
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
+const getRandomElement = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+
+const getRandomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+const ITEM_TYPES = Object.values(ItemSlot);
+
+const BASE_NAMES: Record<ItemSlot, string[]> = {
+  [ItemSlot.HEAD]: ['Cap', 'Helm', 'Casque', 'Basinet', 'Crown'],
+  [ItemSlot.CHEST]: ['Tunic', 'Armor', 'Plate', 'Cuirass', 'Mail'],
+  [ItemSlot.GLOVES]: ['Gloves', 'Gauntlets', 'Mitts', 'Grips'],
+  [ItemSlot.MAIN_HAND]: ['Sword', 'Axe', 'Mace', 'Dagger', 'Wand'],
+  [ItemSlot.OFF_HAND]: ['Shield', 'Buckler', 'Orb', 'Tome'],
+  [ItemSlot.LEGS]: ['Pants', 'Greaves', 'Leggings', 'Skirt'],
+  [ItemSlot.BOOTS]: ['Boots', 'Greaves', 'Sandals', 'Treads'],
+  [ItemSlot.AMULET]: ['Amulet', 'Necklace', 'Talisman', 'Choker'],
+  [ItemSlot.RING]: ['Ring', 'Band', 'Loop', 'Signet'],
+};
+
+const SLOT_ICONS_MAP: Record<ItemSlot, IconName[]> = {
+  [ItemSlot.HEAD]: ['helm', 'hood', 'crown'],
+  [ItemSlot.CHEST]: ['armor', 'robe'],
+  [ItemSlot.GLOVES]: ['gloves'],
+  [ItemSlot.MAIN_HAND]: ['sword', 'axe', 'mace', 'dagger', 'staff'],
+  [ItemSlot.OFF_HAND]: ['shield', 'orb', 'tome'],
+  [ItemSlot.LEGS]: ['legs', 'skirt'],
+  [ItemSlot.BOOTS]: ['boots'],
+  [ItemSlot.AMULET]: ['amulet'],
+  [ItemSlot.RING]: ['ring'],
+};
+
+const MONSTER_NAMES = ['Fallen', 'Zombie', 'Skeleton', 'Scavenger', 'Goatman', 'Spider', 'Gargoyle', 'Demon', 'Cultist', 'Ghost'];
+const ELITE_PREFIXES = ['Vile', 'Cursed', 'Stone', 'Night', 'Blood', 'Flame', 'Void', 'Ancient', 'Shadow'];
+
+export const calculateItemValue = (item: Item): number => {
+    const { baseMultiplier, rarityMultipliers, statBonusMultiplier, identifyPenalty } = BALANCE.ITEM_VALUE;
+    const base = item.level * baseMultiplier;
+    const rarityMult = rarityMultipliers[item.rarity] || 1;
+    
+    const statBonus = item.stats.reduce((acc, stat) => acc + stat.value, 0) * statBonusMultiplier;
+    const identifiedMult = item.isIdentified ? 1 : identifyPenalty;
+    
+    return Math.floor((base * rarityMult + statBonus) * identifiedMult);
+};
+
+export const generateLoot = (level: number, difficulty: number = 1, magicFind: number = 0): Item | null => {
+  const { baseDropChance, difficultyScaling, magicFindFactor, rarityChances, caps } = BALANCE.LOOT;
+  
+  const currentDropChance = baseDropChance + ((difficulty - 1) * difficultyScaling);
+  if (Math.random() > currentDropChance) return null;
+
+  const slot = getRandomElement(ITEM_TYPES);
+  const baseName = getRandomElement(BASE_NAMES[slot]);
+
+  const mfMultiplier = 1 + (magicFind * magicFindFactor);
+  
+  let uniqueChance = (rarityChances[Rarity.UNIQUE] * difficulty) * Math.pow(difficulty, 1.2) * mfMultiplier;
+  let rareChance = (rarityChances[Rarity.RARE] * difficulty) * 1.5 * mfMultiplier;
+  let magicChance = (rarityChances[Rarity.MAGIC] + (difficulty * 0.1)) * mfMultiplier;
+
+  uniqueChance = Math.min(uniqueChance, caps[Rarity.UNIQUE]); 
+  rareChance = Math.min(rareChance, caps[Rarity.RARE]); 
+  magicChance = Math.min(magicChance, caps[Rarity.MAGIC]);
+
+  const roll = Math.random();
+  let rarity = Rarity.COMMON;
+
+  if (roll < uniqueChance) rarity = Rarity.UNIQUE;
+  else if (roll < uniqueChance + rareChance) rarity = Rarity.RARE;
+  else if (roll < uniqueChance + rareChance + magicChance) rarity = Rarity.MAGIC;
+
+  const stats: ItemStat[] = [];
+  let numStats = 1;
+  let statMultiplier = 1;
+
+  switch (rarity) {
+    case Rarity.COMMON: numStats = 1; break;
+    case Rarity.MAGIC: numStats = 2; statMultiplier = 1.2; break;
+    case Rarity.RARE: numStats = 4; statMultiplier = 1.5; break;
+    case Rarity.UNIQUE: numStats = 6; statMultiplier = 2.0; break;
+  }
+
+  const possibleStats = [StatType.STRENGTH, StatType.DEXTERITY, StatType.INTELLIGENCE, StatType.VITALITY, StatType.ARMOR];
+  if (slot === ItemSlot.MAIN_HAND) possibleStats.push(StatType.DAMAGE, StatType.ATTACK_SPEED);
+  if ([ItemSlot.OFF_HAND, ItemSlot.HEAD, ItemSlot.CHEST, ItemSlot.GLOVES, ItemSlot.BOOTS].includes(slot)) possibleStats.push(StatType.ARMOR);
+  if ([ItemSlot.RING, ItemSlot.AMULET, ItemSlot.GLOVES].includes(slot)) possibleStats.push(StatType.CRIT_CHANCE);
+  if ([ItemSlot.RING, ItemSlot.AMULET, ItemSlot.HEAD, ItemSlot.GLOVES, ItemSlot.BOOTS].includes(slot)) possibleStats.push(StatType.MAGIC_FIND);
+
+  for (let i = 0; i < numStats; i++) {
+    const statType = getRandomElement(possibleStats);
+    let baseVal = 0;
+    
+    if ([StatType.STRENGTH, StatType.DEXTERITY, StatType.INTELLIGENCE, StatType.VITALITY].includes(statType)) baseVal = getRandomInt(2, 5) * level;
+    else if (statType === StatType.DAMAGE) baseVal = getRandomInt(2, 4) * level;
+    else if (statType === StatType.ARMOR) baseVal = getRandomInt(5, 10) * level;
+    else if (statType === StatType.CRIT_CHANCE || statType === StatType.ATTACK_SPEED) baseVal = getRandomInt(1, 5);
+    else if (statType === StatType.MAGIC_FIND) baseVal = getRandomInt(5, 15); 
+
+    let val = Math.floor(baseVal * statMultiplier) || 1; 
+    if (rarity === Rarity.UNIQUE && statType === StatType.MAGIC_FIND) val = Math.floor(val * 1.5); 
+
+    if (!stats.find(s => s.type === statType)) stats.push({ type: statType, value: val });
+  }
+
+  let fullName = baseName;
+  let identified = true;
+  if (rarity === Rarity.MAGIC) fullName = `Apprentice's ${baseName}`;
+  if (rarity === Rarity.RARE) fullName = `Forgotten ${baseName} of Power`;
+  if (rarity === Rarity.UNIQUE) { fullName = `Unidentified ${baseName}`; identified = false; }
+
+  let icon: string = getRandomElement(SLOT_ICONS_MAP[slot]);
+  if (baseName.toLowerCase().includes('sword')) icon = 'sword';
+  else if (baseName.toLowerCase().includes('axe')) icon = 'axe';
+  else if (baseName.toLowerCase().includes('mace')) icon = 'mace';
+  else if (baseName.toLowerCase().includes('dagger')) icon = 'dagger';
+  else if (baseName.toLowerCase().includes('wand')) icon = 'staff';
+  else if (baseName.toLowerCase().includes('orb')) icon = 'orb';
+  else if (baseName.toLowerCase().includes('tome')) icon = 'tome';
+
+  return {
+    id: generateId(),
+    name: fullName,
+    type: slot,
+    rarity: rarity,
+    stats: stats,
+    level: level,
+    isIdentified: identified,
+    icon: icon, 
+  };
+};
+
+export const generateMonster = (level: number, difficultyModifier: number = 1.0): Monster => {
+  const baseName = getRandomElement(MONSTER_NAMES);
+  
+  const rand = Math.random();
+  let rarity = MonsterRarity.COMMON;
+  const boost = (difficultyModifier - 1) * 0.1;
+  
+  if (rand > 0.98 - boost) rarity = MonsterRarity.UNIQUE;
+  else if (rand > 0.95 - boost) rarity = MonsterRarity.MYTHIC;
+  else if (rand > 0.90 - boost) rarity = MonsterRarity.EPIC;
+  else if (rand > 0.80 - boost) rarity = MonsterRarity.RARE;
+  else if (rand > 0.60 - boost) rarity = MonsterRarity.UNCOMMON;
+  
+  const config = BALANCE.MONSTER.rarityConfig[rarity];
+
+  const baseAttrVal = Math.floor(10 + (level * 2));
+  const str = Math.floor(baseAttrVal * config.statMult * difficultyModifier);
+  const dex = Math.floor(baseAttrVal * config.statMult * difficultyModifier);
+  const int = Math.floor(baseAttrVal * config.statMult * difficultyModifier);
+  const vit = Math.floor(baseAttrVal * config.statMult * difficultyModifier);
+
+  const maledicts: MaledictAffix[] = [];
+  if (config.maledictCount > 0) {
+      const shuffled = [...MALEDICT_AFFIXES].sort(() => 0.5 - Math.random());
+      maledicts.push(...shuffled.slice(0, config.maledictCount));
+  }
+
+  let bonusDmg = 0, bonusArmor = 0, bonusCrit = 0, bonusLifeSteal = 0, bonusThorns = 0;
+  let bonusStr = 0, bonusDex = 0, bonusInt = 0, bonusVit = 0;
+
+  maledicts.forEach(m => {
+      if (m.statModifiers[StatType.STRENGTH]) bonusStr += m.statModifiers[StatType.STRENGTH] || 0;
+      if (m.statModifiers[StatType.DEXTERITY]) bonusDex += m.statModifiers[StatType.DEXTERITY] || 0;
+      if (m.statModifiers[StatType.INTELLIGENCE]) bonusInt += m.statModifiers[StatType.INTELLIGENCE] || 0;
+      if (m.statModifiers[StatType.VITALITY]) bonusVit += m.statModifiers[StatType.VITALITY] || 0;
+      if (m.statModifiers[StatType.DAMAGE]) bonusDmg += m.statModifiers[StatType.DAMAGE] || 0;
+      if (m.statModifiers[StatType.ARMOR]) bonusArmor += m.statModifiers[StatType.ARMOR] || 0;
+      if (m.statModifiers[StatType.CRIT_CHANCE]) bonusCrit += m.statModifiers[StatType.CRIT_CHANCE] || 0;
+      if (m.statModifiers[StatType.LIFE_STEAL]) bonusLifeSteal += m.statModifiers[StatType.LIFE_STEAL] || 0;
+      if (m.statModifiers[StatType.THORNS]) bonusThorns += m.statModifiers[StatType.THORNS] || 0;
+  });
+
+  const finalStr = str * (1 + (bonusStr / 100));
+  const finalDex = dex * (1 + (bonusDex / 100));
+  const finalInt = int * (1 + (bonusInt / 100));
+  const finalVit = vit * (1 + (bonusVit / 100));
+
+  const maxHp = Math.floor((finalVit * 8) + (level * 20));
+  let damage = Math.floor((finalStr * 0.6) + (level * 3)) * (1 + (bonusDmg / 100));
+  let armor = Math.floor((finalDex * 0.5) + (level * 2)) * (1 + (bonusArmor / 100));
+  const critChance = Math.min(50, (finalInt * 0.1) + bonusCrit + BALANCE.COMBAT.baseCritChance); 
+  const dodgeChance = Math.min(50, (finalDex * 0.1) + (bonusDex > 0 ? 10 : 0) + BALANCE.COMBAT.baseDodgeChance); 
+
+  let name = baseName;
+  let icon = baseName.toLowerCase();
+  if (['scavenger', 'goatman', 'gargoyle'].includes(icon)) icon = 'beast';
+  if (icon === 'fallen') icon = 'zombie';
+
+  if (rarity !== MonsterRarity.COMMON) {
+      const prefix = getRandomElement(ELITE_PREFIXES);
+      name = `${prefix} ${baseName}`;
+  }
+  
+  if (rarity === MonsterRarity.UNIQUE) {
+      name = `${baseName} the ${getRandomElement(['Destroyer', 'Undying', 'Conqueror', 'Vile', 'Ender'])}`;
+      icon = 'boss';
+  }
+
+  return {
+    id: generateId(),
+    name, level, rarity,
+    strength: Math.floor(finalStr), dexterity: Math.floor(finalDex), intelligence: Math.floor(finalInt), vitality: Math.floor(finalVit),
+    maxHp, currentHp: maxHp, damage: Math.floor(damage), armor: Math.floor(armor),
+    critChance, dodgeChance, lifeSteal: bonusLifeSteal, thorns: bonusThorns,
+    icon, maledicts
+  };
+};
+
+export const generatePassiveSkill = (currentPassives: PassiveSkill[]): { skill: PassiveSkill, isNew: boolean } => {
+  const poolItem = getRandomElement(PASSIVE_SKILLS_POOL);
+  const existing = currentPassives.find(p => p.id === poolItem.id);
+
+  if (existing) {
+    const nextLevel = existing.level + 1;
+    return {
+      skill: { ...existing, level: nextLevel, value: existing.baseValue + (nextLevel - 1) * existing.valuePerLevel },
+      isNew: false
+    };
+  } else {
+    return {
+      skill: { ...poolItem, level: 1, value: poolItem.baseValue },
+      isNew: true
+    };
+  }
+};
+
+export const calculatePlayerStats = (
+  baseAttributes: BaseAttributes,
+  equipment: EquipmentMap,
+  passives: PassiveSkill[],
+  level: number,
+  availableStatPoints: number,
+  activeEffects: ActiveEffect[] = []
+): PlayerStats => {
+  const { derived, perLevel } = BALANCE.STATS;
+  
+  let currentStats: PlayerStats = {
+    strength: baseAttributes.strength,
+    dexterity: baseAttributes.dexterity,
+    intelligence: baseAttributes.intelligence,
+    vitality: baseAttributes.vitality,
+    damage: derived.damage,
+    armor: derived.armor,
+    magicFind: derived.magicFind,
+    lifeSteal: 0,
+    critChance: BALANCE.COMBAT.baseCritChance, 
+    dodgeChance: BALANCE.COMBAT.baseDodgeChance, 
+    level: level,
+    xp: 0, xpToNextLevel: 0, gold: 0, maxHp: 100,
+    statPoints: availableStatPoints,
+    activeSetBonuses: [],
+    activeSynergies: []
+  };
+
+  passives.forEach(passive => {
+    if (!passive.statType) return;
+    switch (passive.statType) {
+      case StatType.STRENGTH: currentStats.strength += passive.value; break;
+      case StatType.DEXTERITY: currentStats.dexterity += passive.value; break;
+      case StatType.INTELLIGENCE: currentStats.intelligence += passive.value; break;
+      case StatType.VITALITY: currentStats.vitality += passive.value; break;
+      case StatType.ARMOR: currentStats.armor += passive.value; break;
+      case StatType.MAGIC_FIND: currentStats.magicFind += passive.value; break;
+      case StatType.LIFE_STEAL: currentStats.lifeSteal += passive.value; break;
+      case StatType.CRIT_CHANCE: currentStats.critChance += passive.value; break;
+    }
+  });
+
+  // Check Set Bonuses & Synergies
+  const skillsByTheme = passives.reduce((acc, skill) => {
+      if (!acc[skill.theme]) acc[skill.theme] = new Set();
+      acc[skill.theme].add(skill.id);
+      return acc;
+  }, {} as Record<PassiveTheme, Set<string>>);
+
+  PASSIVE_SET_BONUSES.forEach(bonus => {
+      const userCount = skillsByTheme[bonus.theme]?.size || 0;
+      if (userCount >= bonus.requiredCount) {
+          currentStats.activeSetBonuses.push(bonus.theme);
+          bonus.staticStats.forEach(stat => {
+             switch(stat.type) {
+                case StatType.STRENGTH: currentStats.strength += stat.value; break;
+                case StatType.DEXTERITY: currentStats.dexterity += stat.value; break;
+                case StatType.INTELLIGENCE: currentStats.intelligence += stat.value; break;
+                case StatType.VITALITY: currentStats.vitality += stat.value; break;
+                case StatType.DAMAGE: currentStats.damage += stat.value; break;
+                case StatType.ARMOR: currentStats.armor += stat.value; break;
+                case StatType.MAGIC_FIND: currentStats.magicFind += stat.value; break;
+                case StatType.LIFE_STEAL: currentStats.lifeSteal += stat.value; break;
+                case StatType.CRIT_CHANCE: currentStats.critChance += stat.value; break;
+             }
+          });
+      }
+  });
+
+  // Calculate Composite Synergies
+  COMPOSITE_SYNERGIES.forEach(synergy => {
+      if (currentStats.activeSetBonuses.includes(synergy.themes[0]) && 
+          currentStats.activeSetBonuses.includes(synergy.themes[1])) {
+          currentStats.activeSynergies.push(synergy.id);
+      }
+  });
+
+  Object.values(equipment).forEach(item => {
+    if (!item) return;
+    item.stats.forEach(stat => {
+      switch (stat.type) {
+        case StatType.STRENGTH: currentStats.strength += stat.value; break;
+        case StatType.DEXTERITY: currentStats.dexterity += stat.value; break;
+        case StatType.INTELLIGENCE: currentStats.intelligence += stat.value; break;
+        case StatType.VITALITY: currentStats.vitality += stat.value; break;
+        case StatType.DAMAGE: currentStats.damage += stat.value; break;
+        case StatType.ARMOR: currentStats.armor += stat.value; break;
+        case StatType.MAGIC_FIND: currentStats.magicFind += stat.value; break;
+        case StatType.LIFE_STEAL: currentStats.lifeSteal += stat.value; break;
+        case StatType.CRIT_CHANCE: currentStats.critChance += stat.value; break;
+      }
+    });
+  });
+  
+  activeEffects.forEach(effect => {
+    if (!effect.statType) return;
+    const val = effect.value;
+    switch (effect.statType) {
+      case StatType.STRENGTH: currentStats.strength += val; break;
+      case StatType.DEXTERITY: currentStats.dexterity += val; break;
+      case StatType.INTELLIGENCE: currentStats.intelligence += val; break;
+      case StatType.VITALITY: currentStats.vitality += val; break;
+      case StatType.DAMAGE: currentStats.damage += val; break;
+      case StatType.ARMOR: currentStats.armor += val; break;
+      case StatType.MAGIC_FIND: currentStats.magicFind += val; break;
+      case StatType.LIFE_STEAL: currentStats.lifeSteal += val; break;
+      case StatType.CRIT_CHANCE: currentStats.critChance += val; break;
+    }
+  });
+
+  currentStats.damage += Math.floor(currentStats.strength * 0.5);
+  currentStats.armor += Math.floor(currentStats.dexterity * 0.5);
+  currentStats.dodgeChance += (currentStats.dexterity * 0.2); 
+  currentStats.critChance += (currentStats.intelligence * 0.2);
+  currentStats.maxHp = (currentStats.vitality * 5) + (level * perLevel.hp);
+  
+  currentStats.critChance = Math.min(100, parseFloat(currentStats.critChance.toFixed(1)));
+  currentStats.dodgeChance = Math.min(75, parseFloat(currentStats.dodgeChance.toFixed(1)));
+
+  return currentStats;
+};
