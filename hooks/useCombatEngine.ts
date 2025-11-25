@@ -131,6 +131,10 @@ export const useCombatEngine = ({
     generateEncounterDescription(monster, level).then(addToCombatLog);
   }, [playerStats, setPlayerHp, environment]);
 
+  const updateMonsterImage = useCallback((url: string) => {
+      setActiveMonster(prev => prev ? { ...prev, imageUrl: url } : null);
+  }, []);
+
   // --- DYNAMIC AGILITY RECALC ---
   useEffect(() => {
       if (!isFighting || !activeMonster || !playerStats) return;
@@ -657,7 +661,9 @@ export const useCombatEngine = ({
       battleActions: {
           startBattle,
           flee: handleFlee,
-          setCombatStance
+          setCombatStance,
+          updateMonsterImage
       }
   };
 };
+

@@ -1,7 +1,9 @@
+
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Item, ItemSlot, PlayerStats, EquipmentMap, LogEntry, Rarity, Monster, BaseAttributes, PassiveSkill, MapNode, ExplorationEvent, ActiveEffect, EventType, CombatStatusEffect, CombatStance, MonsterRarity, CombatTrigger, SaveData, BuildLoadout } from './types';
 import { generateLoot, calculatePlayerStats, generateMonster, generatePassiveSkill, calculateItemValue } from './services/gameLogic';
-import { identifyItemWithGemini, generateEncounterDescription, generatePassiveLore, generateCombatNarrative } from './services/geminiService';
+import { identifyItemWithGemini, generateEncounterDescription, generatePassiveLore, generateCombatNarrative, generateImage } from './services/geminiService';
 import { RARITY_COLORS, SLOT_ICONS, MAX_INVENTORY_SIZE, INITIAL_WORLD_MAP, EXPLORATION_EVENTS, PASSIVE_SET_BONUSES, COMPOSITE_SYNERGIES } from './constants';
 import { BALANCE } from './services/gameBalance';
 import { storageService } from './services/storageService';
@@ -622,6 +624,13 @@ export default function App() {
     if (isBoss) { monster.rarity = MonsterRarity.UNIQUE; monster.name = `Overlord of ${area.name}`; monster.icon = 'boss'; monster.maxHp *= 2; monster.currentHp = monster.maxHp; }
     
     battleActions.startBattle(monster, level);
+
+    // AI Generation Trigger
+    const prompt = `A terrifying, high-fidelity dark fantasy digital painting of a ${monster.rarity} monster named "${monster.name}". The creature appears as a ${monster.icon} type. Atmospheric lighting, visceral texture, Diablo-style concept art, centered composition.`;
+    generateImage(prompt).then(url => {
+        if (url) battleActions.updateMonsterImage(url);
+    });
+
   }, [battleState.isFighting, isUIBlocked, stats, mapNodes, currentAreaId, areaProgress, worldDifficulty, level, battleActions, triggerRandomEvent]);
 
   const handleIdentifyAll = useCallback(async () => {
