@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import { MapNode } from '../types';
 import GameIcon from './GameIcon';
@@ -105,12 +107,19 @@ const WorldMapModal: React.FC<WorldMapModalProps> = ({
                     
                     {/* Label */}
                     <div className={`
-                      absolute top-full mt-1 md:mt-2 whitespace-nowrap text-[10px] md:text-xs font-bold px-2 py-1 rounded bg-black/80 border border-stone-700
+                      absolute top-full mt-1 md:mt-2 whitespace-nowrap text-[10px] md:text-xs font-bold px-2 py-1 rounded bg-black/80 border border-stone-700 z-20
                       ${isCurrent ? 'text-amber-500' : 'text-stone-400'}
                     `}>
                       {node.name}
                     </div>
                     
+                    {/* Terrain Badge */}
+                    {!isLocked && (
+                         <div className="absolute -bottom-2 right-0 bg-stone-800 text-[8px] uppercase px-1 rounded border border-stone-600 text-stone-300 z-10">
+                             {node.terrain.substring(0,3)}
+                         </div>
+                    )}
+
                     {/* Cleared Checkmark */}
                     {node.isCleared && (
                       <div className="absolute -top-1 -right-1 bg-green-900 text-green-400 rounded-full w-4 h-4 md:w-5 md:h-5 flex items-center justify-center text-[10px] border border-green-700">
@@ -126,11 +135,18 @@ const WorldMapModal: React.FC<WorldMapModalProps> = ({
         <BaseModal.Footer className="bg-stone-900 border-t border-stone-700 flex flex-col md:flex-row justify-between items-center gap-4">
           {currentNode ? (
             <div className="flex-grow w-full">
-              <h3 className="text-lg md:text-xl text-stone-200 font-bold diablo-font flex items-center gap-3">
-                {currentNode.name}
-                {currentNode.isCleared && <span className="text-[10px] bg-green-900 text-green-300 px-2 py-0.5 rounded border border-green-700">CLEARED</span>}
-              </h3>
-              <p className="text-stone-500 italic text-xs md:text-sm mb-2 truncate">{currentNode.description}</p>
+              <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="text-lg md:text-xl text-stone-200 font-bold diablo-font flex items-center gap-3">
+                        {currentNode.name}
+                        {currentNode.isCleared && <span className="text-[10px] bg-green-900 text-green-300 px-2 py-0.5 rounded border border-green-700">CLEARED</span>}
+                    </h3>
+                    <p className="text-stone-500 italic text-xs md:text-sm mb-2 truncate">{currentNode.description}</p>
+                  </div>
+                  <div className="text-right">
+                      <div className="text-xs text-amber-500 font-bold uppercase tracking-wider">{currentNode.terrain}</div>
+                  </div>
+              </div>
               
               {/* Progress Bar */}
               <div className="w-full max-w-md bg-stone-950 h-3 md:h-4 rounded border border-stone-700 relative overflow-hidden">

@@ -1,4 +1,5 @@
 
+
 export enum Rarity {
   COMMON = 'Common',
   MAGIC = 'Magic',
@@ -77,7 +78,40 @@ export enum PassiveTheme {
   CRYOMANCY = 'Cryomancy', // Ice / Armor / Int
   SHADOW = 'Shadow',       // Poison / Crit / Dex / Life Steal
   SENTINEL = 'Sentinel',   // Defense / Vit / Thorns
-  FORTUNE = 'Fortune'      // Magic Find / Gold
+  FORTUNE = 'Fortune',      // Magic Find / Gold
+  WARFARE = 'Warfare',
+  NATURE = 'Nature',
+  ARCANE = 'Arcane',
+  SCOUTING = 'Scouting'
+}
+
+// Complex Skill Logic Types
+export type ProcTrigger = 'onStartTurn' | 'onEndTurn' | 'onAttack' | 'onHit' | 'onCrit' | 'onTakeDamage' | 'onKill' | 'onBattleStart';
+
+export interface ProcCondition {
+    type: 'hp_below' | 'hp_above' | 'enemy_hp_below' | 'has_buff' | 'enemy_has_debuff' | 'turn_count_multiple';
+    value: number | string; // e.g. 0.3 (30%), 'burn', 3 (every 3rd turn)
+}
+
+export interface ProcCost {
+    type: 'hp_flat' | 'hp_percent';
+    value: number;
+}
+
+export interface SkillProcDefinition {
+    trigger: ProcTrigger;
+    chance: number; // 0-1
+    cooldown: number; // Turns
+    cost?: ProcCost;
+    conditions?: ProcCondition[];
+    effect: {
+        type: 'damage_phys' | 'damage_magic' | 'heal' | 'buff' | 'debuff' | 'cleanse' | 'multi_hit' | 'shield';
+        subType?: 'burn' | 'freeze' | 'poison' | 'blind' | 'regen' | 'crit_boost' | 'chill' | 'stun' | 'explode' | 'shield' | 'scaling_strength' | 'dodge_boost';
+        value: number; // Multiplier of relevant stat OR flat value
+        duration?: number;
+        isStackable?: boolean;
+    };
+    description: string; // Short proc description for UI
 }
 
 export interface PassiveSkill {
@@ -86,14 +120,18 @@ export interface PassiveSkill {
   description: string;
   theme: PassiveTheme;
   level: number;
+  rarity: Rarity; // New: Skills now have rarity
   statType?: StatType; // If it boosts a stat directly
   value: number; // The current calculated value
   baseValue: number;
   valuePerLevel: number;
   flavorText?: string;
+  
+  // New: Active Component
+  proc?: SkillProcDefinition;
 }
 
-export type CombatTrigger = 'onStartTurn' | 'onEndTurn' | 'onAttack' | 'onHit' | 'onCrit' | 'onTakeDamage' | 'onKill';
+export type CombatTrigger = ProcTrigger;
 
 export interface PassiveSetBonus {
     theme: PassiveTheme;
@@ -106,7 +144,7 @@ export interface PassiveSetBonus {
     triggerCondition: CombatTrigger;
     procChance: number; // 0-1 (e.g., 0.2 for 20%)
     procEffect: {
-        type: 'burn' | 'freeze' | 'poison' | 'blind' | 'regen' | 'crit_boost' | 'chill' | 'explode' | 'stun';
+        type: 'burn' | 'freeze' | 'poison' | 'blind' | 'regen' | 'crit_boost' | 'chill' | 'explode' | 'stun' | 'shield';
         duration: number; // Turns
         value: number; // Damage amount or percent or stack count
         isStackable?: boolean;
@@ -127,12 +165,12 @@ export interface SynergyDefinition {
 
 export interface CombatStatusEffect {
     id: string;
-    type: 'burn' | 'freeze' | 'poison' | 'blind' | 'regen' | 'crit_boost' | 'chill' | 'stun' | 'explode' | 'shield';
+    type: 'burn' | 'freeze' | 'poison' | 'blind' | 'regen' | 'crit_boost' | 'chill' | 'stun' | 'explode' | 'shield' | 'scaling_strength' | 'dodge_boost';
     name: string;
     duration: number; // Turns remaining
     value: number;
     stacks: number;
-    source: 'set_bonus' | 'skill' | 'maledict' | 'synergy';
+    source: 'set_bonus' | 'skill' | 'maledict' | 'synergy' | 'environment';
     target: 'player' | 'enemy';
     description?: string;
 }
@@ -146,6 +184,14 @@ export interface ActiveEffect {
   duration: number; // Number of battles remaining
   isDebuff: boolean;
   icon: string;
+}
+
+export interface BuildLoadout {
+    id: string;
+    name: string;
+    timestamp: number;
+    equippedSkillIds: string[];
+    description?: string;
 }
 
 export interface PlayerStats {
@@ -168,6 +214,7 @@ export interface PlayerStats {
   activeSetBonuses: PassiveTheme[];
   activeSynergies: string[]; // IDs of active synergies
   heroImageUrl?: string; // Custom Hero Avatar
+  equippedSkillIds: string[]; // Access to IDs for combat engine
 }
 
 export interface MaledictAffix {
@@ -225,11 +272,21 @@ export interface LogEntry {
   timestamp: number;
 }
 
+export enum TerrainType {
+    RUINS = 'Ruins',
+    FOREST = 'Forest',
+    CRYPT = 'Crypt',
+    SWAMP = 'Swamp',
+    PLAINS = 'Plains',
+    VOID = 'Void'
+}
+
 export interface MapNode {
   id: string;
   name: string;
   level: number; // Area level
   description: string;
+  terrain: TerrainType;
   coordinates: { x: number; y: number }; // Percentages 0-100
   connections: string[]; // IDs of connected nodes
   isUnlocked: boolean;
@@ -249,6 +306,7 @@ export interface ExplorationEvent {
   title: string;
   description: string;
   type: EventType;
+  grantSkillRarity?: Rarity; // New: Event can grant a specific rarity skill
   effect: {
     statType?: StatType;
     value?: number; // For stats or damage
@@ -291,6 +349,8 @@ export interface SaveData {
     baseAttributes: BaseAttributes;
     statPoints: number;
     passiveSkills: PassiveSkill[];
+    equippedSkillIds: string[]; // New: Track active skills
+    buildLoadouts: BuildLoadout[]; // New: Saved builds
     activeEffects: ActiveEffect[];
     inventory: (Item | null)[];
     equipment: EquipmentMap;
@@ -302,4 +362,5 @@ export interface SaveData {
     groundItems: Item[];
     heroImageUrl?: string;
     timestamp: number;
+    // We could save day/night here too, but defaulting to Day on load is fine
 }

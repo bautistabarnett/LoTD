@@ -103,7 +103,7 @@ const VisualizerModal: React.FC<VisualizerModalProps> = ({ target, onSave, onClo
                     />
                 </div>
                 
-                <div className="flex flex-col md:flex-row gap-2 md:gap-4 mt-2">
+                <div className="button-group md:flex md:flex-row md:gap-4 mt-2">
                     <button 
                         onClick={handleGenerate}
                         disabled={isLoading}

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Monster, PlayerStats, CombatStatusEffect, ActiveEffect, CombatStance, MaledictAffix } from '../types';
@@ -24,16 +23,16 @@ interface FloatingNumber { id: number; value: string; type: 'damage' | 'heal' | 
 const FloatingText: React.FC<{ num: FloatingNumber }> = ({ num }) => {
   const color = num.type === 'heal' ? 'text-green-400' : num.type === 'crit' ? 'text-yellow-400 scale-150' : num.type === 'miss' ? 'text-blue-300' : 'text-red-500';
   return (
-    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-bold diablo-font text-2xl md:text-4xl pointer-events-none z-50 drop-shadow-md animate-float-up ${color}`} style={{ marginLeft: `${num.x}px`, textShadow: '0 2px 4px rgba(0,0,0,1)' }}>{num.value}</div>
+    <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-bold diablo-font text-2xl md:text-4xl lg:text-5xl pointer-events-none z-50 drop-shadow-md animate-float-up ${color}`} style={{ marginLeft: `${num.x}px`, textShadow: '0 2px 4px rgba(0,0,0,1)' }}>{num.value}</div>
   );
 };
 
 const StatPlate: React.FC<{ label: string; value: string | number; icon: string; color?: string }> = ({ label, value, icon, color = 'text-stone-200' }) => (
-    <div className="bg-black/40 border border-stone-700 rounded px-2 py-1 flex items-center gap-2 min-w-[80px]">
-        <span className="text-xs opacity-70 grayscale">{icon}</span>
+    <div className="bg-black/40 border border-stone-700 rounded px-2 py-1 lg:px-4 lg:py-2 flex items-center gap-2 min-w-[80px] lg:min-w-[100px]">
+        <span className="text-xs lg:text-sm opacity-70 grayscale">{icon}</span>
         <div className="flex flex-col leading-none">
-            <span className="text-[9px] text-stone-500 uppercase font-bold">{label}</span>
-            <span className={`text-xs font-mono font-bold ${color}`}>{value}</span>
+            <span className="text-[9px] lg:text-[11px] text-stone-500 uppercase font-bold">{label}</span>
+            <span className={`text-xs lg:text-sm font-mono font-bold ${color}`}>{value}</span>
         </div>
     </div>
 );
@@ -44,12 +43,12 @@ const HealthBar: React.FC<{ current: number; max: number; isEnemy?: boolean; lab
   
   return (
     <div className="w-full relative group shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-       <div className="h-6 bg-black border border-stone-600 rounded relative overflow-hidden">
+       <div className="h-6 lg:h-8 bg-black border border-stone-600 rounded relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30"></div>
           <div className={`h-full transition-all duration-300 ease-out ${barColor} relative`} style={{ width: `${percentage}%` }}>
               <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent"></div>
           </div>
-          <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,1)] z-10 font-mono tracking-widest">
+          <div className="absolute inset-0 flex items-center justify-center text-[10px] lg:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,1)] z-10 font-mono tracking-widest">
              {Math.ceil(current)} / {max}
           </div>
        </div>
@@ -60,7 +59,8 @@ const HealthBar: React.FC<{ current: number; max: number; isEnemy?: boolean; lab
 
 const EFFECT_ICONS: Record<string, string> = { 
     burn: '🔥', freeze: '❄️', poison: '🤢', blind: '🙈', regen: '💖', 
-    crit_boost: '⚡', chill: '🥶', stun: '💫', explode: '💥', shield: '🛡️' 
+    crit_boost: '⚡', chill: '🥶', stun: '💫', explode: '💥', shield: '🛡️',
+    scaling_strength: '💪', dodge_boost: '💨' 
 };
 
 // Unified Effect Types
@@ -104,7 +104,7 @@ const AuraTooltip: React.FC<{ effect: AnyEffect; rect: DOMRect | null }> = ({ ef
 
   return createPortal(
     <div 
-        className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-150"
+        className="fixed z-[9999] pointer-events-none animate-in fade-in zoom-in-95 duration-150 tooltip-card"
         style={{ top, left: clampedLeft, width: tooltipWidth, transform }}
     >
         <div className="bg-[#151413] border-2 border-stone-500 shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-sm p-3 relative text-xs overflow-hidden">
@@ -186,14 +186,15 @@ const AuraBadge: React.FC<{
 
     return (
         <div 
-            className={`relative w-8 h-8 md:w-10 md:h-10 border ${borderColor} ${bgColor} rounded flex items-center justify-center cursor-help transition-all duration-200 hover:scale-110 hover:shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:z-20 group`}
+            className={`relative w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 border ${borderColor} ${bgColor} rounded flex items-center justify-center cursor-help transition-all duration-200 hover:scale-110 hover:shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:z-20 group aura-badge`}
             onMouseEnter={(e) => onHover(e, effect)}
+            onClick={(e) => onHover(e, effect)} // For mobile support
             onMouseLeave={onLeave}
         >
-            <span className="text-sm md:text-lg filter drop-shadow opacity-90 group-hover:opacity-100">{icon}</span>
+            <span className="text-sm md:text-lg lg:text-xl filter drop-shadow opacity-90 group-hover:opacity-100">{icon}</span>
             
             {badgeText && (
-                 <span className="absolute -bottom-1 -right-1 bg-black text-[9px] text-stone-300 px-1 rounded leading-none border border-stone-800 shadow z-10 font-mono font-bold">
+                 <span className="absolute -bottom-1 -right-1 bg-black text-[9px] lg:text-[10px] text-stone-300 px-1 rounded leading-none border border-stone-800 shadow z-10 font-mono font-bold">
                     {badgeText}
                  </span>
             )}
@@ -220,11 +221,17 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
   const [hoveredEffect, setHoveredEffect] = useState<{ effect: AnyEffect; rect: DOMRect } | null>(null);
 
   const handleEffectHover = (e: React.MouseEvent<HTMLDivElement>, effect: AnyEffect) => {
+      // Prevent rapid re-render if hovering same effect
+      if (hoveredEffect?.effect === effect) return;
+      
       const rect = e.currentTarget.getBoundingClientRect();
       setHoveredEffect({ effect, rect });
   };
   
-  const handleEffectLeave = () => setHoveredEffect(null);
+  const handleEffectLeave = () => {
+    // Optional: Add small delay for mouse leave if needed, but instant is standard
+    setHoveredEffect(null);
+  };
 
   useEffect(() => {
     const diff = playerHp - prevPlayerHp.current;
@@ -244,42 +251,57 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
     prevMonsterHp.current = monster.currentHp;
   }, [monster.currentHp]);
 
+  // Global click to close tooltip on mobile if clicking outside
+  useEffect(() => {
+      const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+          if (hoveredEffect && !(e.target as HTMLElement).closest('.aura-badge')) {
+              setHoveredEffect(null);
+          }
+      };
+      window.addEventListener('click', handleClickOutside);
+      window.addEventListener('touchstart', handleClickOutside);
+      return () => {
+          window.removeEventListener('click', handleClickOutside);
+          window.removeEventListener('touchstart', handleClickOutside);
+      };
+  }, [hoveredEffect]);
+
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
        
        {/* Tooltip Portal Layer */}
        {hoveredEffect && <AuraTooltip effect={hoveredEffect.effect} rect={hoveredEffect.rect} />}
 
-       {/* Battle Container */}
+       {/* Battle Container - Responsive sizing */}
        <div className="w-full h-full max-w-[90%] max-h-[90%] flex flex-col relative pointer-events-auto">
            
            {/* Timeline Header */}
-           <div className="h-12 bg-black/80 border-b border-stone-800 flex items-center justify-center gap-2 relative">
-                <div className="text-[10px] text-stone-500 uppercase font-bold mr-2 tracking-widest">Turn Order</div>
+           <div className="h-12 lg:h-16 bg-black/80 border-b border-stone-800 flex items-center justify-center gap-2 lg:gap-3 relative">
+                <div className="text-[10px] lg:text-xs text-stone-500 uppercase font-bold mr-2 tracking-widest">Turn Order</div>
                 {turnQueue.slice(0, 15).map((actor, idx) => (
-                    <div key={idx} className={`w-6 h-6 rounded-full flex items-center justify-center border shadow-md transition-all ${actor === 'player' ? 'bg-stone-800 border-green-600' : 'bg-stone-900 border-red-600'} ${idx === 0 ? 'scale-125 z-10 ring-2 ring-amber-500' : 'opacity-60 scale-90'}`}>
-                        <span className="text-[10px]">{actor === 'player' ? '👤' : '👹'}</span>
+                    <div key={idx} className={`w-6 h-6 lg:w-8 lg:h-8 rounded-full flex items-center justify-center border shadow-md transition-all ${actor === 'player' ? 'bg-stone-800 border-green-600' : 'bg-stone-900 border-red-600'} ${idx === 0 ? 'scale-125 z-10 ring-2 ring-amber-500' : 'opacity-60 scale-90'}`}>
+                        <span className="text-[10px] lg:text-xs">{actor === 'player' ? '👤' : '👹'}</span>
                     </div>
                 ))}
-                <div className="absolute right-4 top-2">
-                    <button onClick={onFlee} className="px-4 py-1 bg-stone-800 hover:bg-red-900/80 border border-stone-600 text-stone-300 text-xs uppercase font-bold rounded transition-colors">Run Away</button>
+                <div className="absolute right-4 top-2 lg:top-4">
+                    <button onClick={onFlee} className="px-4 py-1 lg:py-2 bg-stone-800 hover:bg-red-900/80 border border-stone-600 text-stone-300 text-xs lg:text-sm uppercase font-bold rounded transition-colors button">Run Away</button>
                 </div>
            </div>
 
            {/* Main Arena */}
-           <div className="flex-grow flex items-center justify-between px-12 md:px-24 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-900/30 via-black/60 to-black/90">
+           <div className="flex-grow flex items-center justify-between px-4 md:px-12 lg:px-32 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-900/30 via-black/60 to-black/90">
                 
                 {/* HERO SIDE */}
-                <div className="flex flex-col items-center gap-4 w-64 z-10">
-                    <div className={`w-32 h-32 md:w-40 md:h-40 rounded-full border-4 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative transition-all duration-500 ${isPlayerTurn ? 'border-green-600 shadow-[0_0_30px_rgba(22,163,74,0.3)] scale-105' : 'border-stone-700 grayscale-[0.3]'}`}>
+                <div className="flex flex-col items-center gap-4 lg:gap-6 w-1/3 lg:w-80 z-10">
+                    <div className={`w-24 h-24 md:w-40 md:h-40 lg:w-56 lg:h-56 rounded-full border-4 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative transition-all duration-500 ${isPlayerTurn ? 'border-green-600 shadow-[0_0_30px_rgba(22,163,74,0.3)] scale-105' : 'border-stone-700 grayscale-[0.3]'}`}>
                         <div className="absolute inset-0 bg-black/40 rounded-full"></div>
                         <GameIcon name="hero" className="w-full h-full drop-shadow-2xl" />
                         {heroFloats.map(f => <FloatingText key={f.id} num={f} />)}
                     </div>
                     
-                    <div className="w-full space-y-2">
+                    <div className="w-full space-y-2 lg:space-y-4">
                         <HealthBar current={playerHp} max={playerStats.maxHp} label="HERO" />
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-2 lg:gap-4">
                             <StatPlate label="Dmg" value={playerStats.damage} icon="⚔️" />
                             <StatPlate label="Arm" value={playerStats.armor} icon="🛡️" />
                         </div>
@@ -292,28 +314,28 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
                 </div>
 
                 {/* VS CENTER */}
-                <div className="flex flex-col items-center z-10">
-                    <div className="text-6xl diablo-font text-red-800 font-bold drop-shadow-[0_0_15px_rgba(153,27,27,0.8)] animate-pulse opacity-80">VS</div>
-                    <div className="mt-8 flex gap-1 bg-black/60 p-1 rounded border border-stone-800 backdrop-blur-sm">
+                <div className="flex flex-col items-center z-10 mx-2">
+                    <div className="text-4xl md:text-6xl lg:text-8xl diablo-font text-red-800 font-bold drop-shadow-[0_0_15px_rgba(153,27,27,0.8)] animate-pulse opacity-80">VS</div>
+                    <div className="mt-4 md:mt-8 flex gap-1 bg-black/60 p-1 rounded border border-stone-800 backdrop-blur-sm">
                         {[CombatStance.AGGRESSIVE, CombatStance.BALANCED, CombatStance.DEFENSIVE].map(s => (
-                            <button key={s} onClick={() => onSetStance(s)} className={`w-8 h-8 flex items-center justify-center rounded transition-all ${combatStance === s ? 'bg-stone-700 text-amber-400 border border-stone-500 shadow-inner' : 'text-stone-600 hover:text-stone-300 hover:bg-stone-800'}`}>
-                                <span className="text-sm">{s === CombatStance.AGGRESSIVE ? '⚔️' : s === CombatStance.DEFENSIVE ? '🛡️' : '⚖️'}</span>
+                            <button key={s} onClick={() => onSetStance(s)} className={`w-8 h-8 lg:w-12 lg:h-12 flex items-center justify-center rounded transition-all ${combatStance === s ? 'bg-stone-700 text-amber-400 border border-stone-500 shadow-inner' : 'text-stone-600 hover:text-stone-300 hover:bg-stone-800'}`}>
+                                <span className="text-sm lg:text-lg">{s === CombatStance.AGGRESSIVE ? '⚔️' : s === CombatStance.DEFENSIVE ? '🛡️' : '⚖️'}</span>
                             </button>
                         ))}
                     </div>
                 </div>
 
                 {/* MONSTER SIDE */}
-                <div className="flex flex-col items-center gap-4 w-64 z-10">
-                    <div className={`w-32 h-32 md:w-40 md:h-40 rounded-full border-4 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative transition-all duration-500 ${!isPlayerTurn ? `border-red-600 ${rarityConfig.glow} scale-105` : 'border-stone-700 grayscale-[0.3]'}`}>
+                <div className="flex flex-col items-center gap-4 lg:gap-6 w-1/3 lg:w-80 z-10">
+                    <div className={`w-24 h-24 md:w-40 md:h-40 lg:w-56 lg:h-56 rounded-full border-4 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative transition-all duration-500 ${!isPlayerTurn ? `border-red-600 ${rarityConfig.glow} scale-105` : 'border-stone-700 grayscale-[0.3]'}`}>
                         <div className="absolute inset-0 bg-black/40 rounded-full"></div>
                         <GameIcon name={monster.icon} imageUrl={monster.imageUrl} className={`w-full h-full drop-shadow-2xl ${rarityConfig.color}`} />
                         {enemyFloats.map(f => <FloatingText key={f.id} num={f} />)}
                     </div>
                     
-                    <div className="w-full space-y-2">
+                    <div className="w-full space-y-2 lg:space-y-4">
                         <HealthBar current={monster.currentHp} max={monster.maxHp} isEnemy label={monster.rarity} />
-                        <div className="grid grid-cols-2 gap-2">
+                        <div className="grid grid-cols-2 gap-2 lg:gap-4">
                             <StatPlate label="Dmg" value={monster.damage} icon="⚔️" color="text-red-400" />
                             <StatPlate label="Arm" value={monster.armor} icon="🛡️" />
                         </div>
@@ -327,8 +349,8 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
            </div>
 
            {/* Combat Log Footer */}
-           <div className="h-16 bg-black/90 border-t border-stone-800 flex items-center justify-center relative z-20">
-                <div className={`text-lg diablo-font tracking-wide ${latestLog.includes('CRIT') ? 'text-yellow-500 animate-pulse font-bold' : 'text-stone-300'}`}>
+           <div className="h-16 lg:h-24 bg-black/90 border-t border-stone-800 flex items-center justify-center relative z-20">
+                <div className={`text-sm md:text-lg lg:text-2xl diablo-font tracking-wide text-center px-4 ${latestLog.includes('CRIT') ? 'text-yellow-500 animate-pulse font-bold' : 'text-stone-300'}`}>
                     {latestLog}
                 </div>
            </div>

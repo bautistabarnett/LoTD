@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface ContainerProps {
@@ -37,7 +36,7 @@ export const BaseModal = {
   }: ContainerProps) => (
     <div className={`fixed inset-0 ${zIndex} flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200`}>
       <div 
-        className={`w-full ${maxWidth} bg-[#1c1917] border border-stone-700 shadow-[0_20px_50px_rgba(0,0,0,0.9)] rounded-lg flex flex-col relative overflow-hidden max-h-[90vh] animate-in zoom-in duration-300 ${className}`}
+        className={`ventana w-full ${maxWidth} bg-[#1c1917] border border-stone-700 shadow-[0_20px_50px_rgba(0,0,0,0.9)] rounded-lg flex flex-col relative overflow-hidden max-h-[90vh] animate-in zoom-in duration-300 ${className}`}
         style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.5), 0 20px 60px rgba(0,0,0,0.9)' }}
       >
         {children}

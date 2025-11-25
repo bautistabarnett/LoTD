@@ -1,5 +1,6 @@
 
-import { Item, ItemSlot, Rarity, StatType, ItemStat, Monster, BaseAttributes, PassiveSkill, PlayerStats, EquipmentMap, ActiveEffect, PassiveTheme, MonsterRarity, MaledictAffix } from '../types';
+
+import { Item, ItemSlot, Rarity, StatType, ItemStat, Monster, BaseAttributes, PassiveSkill, PlayerStats, EquipmentMap, ActiveEffect, PassiveTheme, MonsterRarity, MaledictAffix, SynergyDefinition } from '../types';
 import { PASSIVE_SKILLS_POOL, PASSIVE_SET_BONUSES, COMPOSITE_SYNERGIES, MALEDICT_AFFIXES } from '../constants';
 import { BALANCE } from './gameBalance';
 import { IconName } from '../components/GameIcon';
@@ -214,8 +215,37 @@ export const generateMonster = (level: number, difficultyModifier: number = 1.0)
   };
 };
 
-export const generatePassiveSkill = (currentPassives: PassiveSkill[]): { skill: PassiveSkill, isNew: boolean } => {
-  const poolItem = getRandomElement(PASSIVE_SKILLS_POOL);
+// Updated generator to allow targetted rarity filtering
+export const generatePassiveSkill = (
+    currentPassives: PassiveSkill[], 
+    filters?: { 
+        minRarity?: Rarity, 
+        exactRarity?: Rarity,
+        excludeRarities?: Rarity[] 
+    }
+): { skill: PassiveSkill, isNew: boolean } => {
+  
+  let pool = PASSIVE_SKILLS_POOL;
+
+  // Filter Pool based on constraints
+  if (filters) {
+      if (filters.exactRarity) {
+          pool = pool.filter(s => s.rarity === filters.exactRarity);
+      } else {
+          if (filters.minRarity) {
+              const rMap = { [Rarity.COMMON]: 0, [Rarity.MAGIC]: 1, [Rarity.RARE]: 2, [Rarity.UNIQUE]: 3 };
+              pool = pool.filter(s => rMap[s.rarity || Rarity.COMMON] >= rMap[filters.minRarity!]);
+          }
+          if (filters.excludeRarities) {
+              pool = pool.filter(s => !filters.excludeRarities!.includes(s.rarity || Rarity.COMMON));
+          }
+      }
+  }
+
+  // Fallback if pool empty (shouldn't happen unless bad filters)
+  if (pool.length === 0) pool = PASSIVE_SKILLS_POOL.filter(s => s.rarity === Rarity.COMMON);
+
+  const poolItem = getRandomElement(pool);
   const existing = currentPassives.find(p => p.id === poolItem.id);
 
   if (existing) {
@@ -238,7 +268,8 @@ export const calculatePlayerStats = (
   passives: PassiveSkill[],
   level: number,
   availableStatPoints: number,
-  activeEffects: ActiveEffect[] = []
+  activeEffects: ActiveEffect[] = [],
+  equippedSkillIds: string[] = [] // Optional: if provided, filters passive application
 ): PlayerStats => {
   const { derived, perLevel } = BALANCE.STATS;
   
@@ -257,10 +288,16 @@ export const calculatePlayerStats = (
     xp: 0, xpToNextLevel: 0, gold: 0, maxHp: 100,
     statPoints: availableStatPoints,
     activeSetBonuses: [],
-    activeSynergies: []
+    activeSynergies: [],
+    equippedSkillIds: equippedSkillIds
   };
 
-  passives.forEach(passive => {
+  // Filter skills based on what is equipped, or use all if no equipped list provided (legacy support)
+  const activeSkills = equippedSkillIds.length > 0 
+      ? passives.filter(p => equippedSkillIds.includes(p.id))
+      : passives;
+
+  activeSkills.forEach(passive => {
     if (!passive.statType) return;
     switch (passive.statType) {
       case StatType.STRENGTH: currentStats.strength += passive.value; break;
@@ -274,8 +311,8 @@ export const calculatePlayerStats = (
     }
   });
 
-  // Check Set Bonuses & Synergies
-  const skillsByTheme = passives.reduce((acc, skill) => {
+  // Check Set Bonuses & Synergies based on ACTIVE skills
+  const skillsByTheme = activeSkills.reduce((acc, skill) => {
       if (!acc[skill.theme]) acc[skill.theme] = new Set();
       acc[skill.theme].add(skill.id);
       return acc;
@@ -353,3 +390,36 @@ export const calculatePlayerStats = (
 
   return currentStats;
 };
+
+// Recommendation Engine
+export const getRecommendedSkills = (stats: PlayerStats, allSkills: PassiveSkill[]): PassiveSkill[] => {
+    const recommendations: PassiveSkill[] = [];
+    
+    // 1. Stat Synergy: Top attribute check
+    const attrs = [
+        { name: 'Strength', val: stats.strength, theme: PassiveTheme.PYROMANCY },
+        { name: 'Dexterity', val: stats.dexterity, theme: PassiveTheme.SHADOW },
+        { name: 'Intelligence', val: stats.intelligence, theme: PassiveTheme.CRYOMANCY },
+        { name: 'Vitality', val: stats.vitality, theme: PassiveTheme.SENTINEL },
+    ].sort((a,b) => b.val - a.val);
+
+    const topTheme = attrs[0].theme;
+    
+    // Recommend a skill from top theme not yet active? Or just from pool
+    const themeMatch = allSkills.find(s => s.theme === topTheme);
+    if (themeMatch) recommendations.push(themeMatch);
+
+    // 2. Set Bonus Chase
+    // If player has 2 skills of a theme, recommend a 3rd
+    const counts: Record<string, number> = {};
+    allSkills.forEach(s => counts[s.theme] = (counts[s.theme] || 0) + 1);
+    
+    // Find theme with 2 skills (assuming limit is 3 for bonus, though typically reqCount is 3)
+    const nearBonusTheme = Object.keys(counts).find(t => counts[t] === 2) as PassiveTheme | undefined;
+    if (nearBonusTheme) {
+        const missing = allSkills.find(s => s.theme === nearBonusTheme); 
+        if(missing) recommendations.push(missing);
+    }
+
+    return [...new Set(recommendations)].slice(0, 3);
+}

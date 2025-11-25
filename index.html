@@ -2,7 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <!-- Viewport setting for proper mobile scaling -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover">
     <title>Loot of the Void</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -21,15 +22,91 @@
         color: #a8a29e;
         font-family: 'Lato', sans-serif;
         overflow: hidden; /* Prevent window scrolling */
-        height: 100vh;
+        height: 100vh; /* Fallback */
+        height: 100dvh; /* Mobile browser friendly */
         width: 100vw;
         display: flex;
         align-items: center;
         justify-content: center;
         margin: 0;
         padding: 0;
+        touch-action: manipulation; /* Improves touch response */
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      /* --- Global Component Styles (Refactored) --- */
+      
+      .slot, .ventana, .button-base {
+        box-sizing: border-box;
+        transition: all 0.2s ease-in-out;
+      }
+
+      /* Slots */
+      .slot {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        user-select: none;
+      }
+
+      /* Modals/Windows */
+      .ventana {
+        box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 20px 60px rgba(0,0,0,0.9);
+      }
+
+      /* Base styles for images and emojis to ensure they don't overflow */
+      img, .emoji {
+        max-width: 100%;
+        height: auto;
+        object-fit: contain;
+        margin: 0 auto;
+        display: block;
+      }
+
+      /* Accessibility: Minimum touch target size (44px) and base styling */
+      button {
+        min-width: 44px;
+        min-height: 44px;
+        font-size: 1.2em;
+        border-radius: 8px;
+        touch-action: manipulation;
+      }
+
+      /* Mobile Breakpoint (Max width 768px) */
+      @media (max-width: 768px) {
+        
+        /* Main Container: Flex column layout for mobile */
+        .container-principal {
+          display: flex;
+          flex-direction: column;
+          /* Removed padding/gap for full screen app feel on mobile */
+          padding: 0; 
+          gap: 0;
+          box-sizing: border-box;
+          max-height: 100dvh;
+          overflow: hidden;
+        }
+
+        /* Slots and Windows: Dynamic text sizing and overflow protection */
+        .slot, .ventana {
+          margin-bottom: 0; /* Tighten up mobile layout */
+          font-size: clamp(0.9em, 2vw, 1.1em); /* Slightly smaller base */
+          overflow-wrap: break-word;
+          word-break: break-all;
+        }
+
+        /* Interactive Elements */
+        .button-group {
+          display: flex;
+          flex-direction: column;
+          gap: 0.5em;
+          margin-top: 0.5em;
+        }
       }
       
+      /* --- Typography --- */
+
       h1, h2, h3, h4, h5, h6, .diablo-font {
         font-family: 'Cinzel', serif;
       }
@@ -90,17 +167,6 @@
           0 4px 6px rgba(0,0,0,0.5);
       }
 
-      .gold-border {
-        border: 1px solid #b45309;
-        box-shadow: 
-          0 0 0 1px #78350f,
-          inset 0 0 10px rgba(245, 158, 11, 0.1);
-      }
-
-      .inner-shadow {
-        box-shadow: inset 0 2px 10px rgba(0,0,0,0.8);
-      }
-
       .text-gold-gradient {
         background: linear-gradient(180deg, #fcd34d 0%, #b45309 100%);
         -webkit-background-clip: text;
@@ -108,10 +174,8 @@
         text-shadow: 0 2px 4px rgba(0,0,0,0.5);
       }
 
-      .glass-panel {
-        background: rgba(12, 10, 9, 0.85);
-        backdrop-filter: blur(8px);
-        border: 1px solid rgba(68, 64, 60, 0.5);
+      .inner-shadow {
+        box-shadow: inset 0 2px 10px rgba(0,0,0,0.8);
       }
 
       /* Custom scrollbar */
@@ -150,7 +214,7 @@
 </script>
 </head>
   <body>
-    <div id="root"></div>
+    <div id="root" style="width: 100%; height: 100%;"></div>
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

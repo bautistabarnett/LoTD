@@ -38,6 +38,14 @@ const InventorySlot: React.FC<InventorySlotProps> = ({
     }
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+      if (item) {
+          const touch = e.touches[0];
+          // Update hover item on touch start to ensure tooltip renders
+          setHoverItem(item, { x: touch.clientX, y: touch.clientY });
+      }
+  };
+
   const handleMouseLeave = () => {
     setHoverItem(null, { x: 0, y: 0 });
   };
@@ -66,7 +74,8 @@ const InventorySlot: React.FC<InventorySlotProps> = ({
   return (
     <div 
       className={`
-        w-12 h-12 relative transition-all duration-200 group flex items-center justify-center select-none
+        slot
+        w-12 h-12 lg:w-14 lg:h-14 2xl:w-16 2xl:h-16 relative transition-all duration-200 group flex items-center justify-center select-none
         ${item 
             ? `bg-stone-900 border ${getSlotStyles(item.rarity)} hover:scale-105 hover:z-10` 
             : `bg-[#050505] border border-stone-800 inner-shadow hover:border-stone-600 ${isActive ? 'border-stone-500 bg-stone-800' : ''}`
@@ -78,6 +87,7 @@ const InventorySlot: React.FC<InventorySlotProps> = ({
       onClick={onClick}
       onContextMenu={(e) => { e.preventDefault(); onRightClick(e); }}
       onMouseEnter={handleMouseEnter}
+      onTouchStart={handleTouchStart}
       onMouseLeave={handleMouseLeave}
       onMouseMove={handleMouseMove}
       
@@ -95,7 +105,7 @@ const InventorySlot: React.FC<InventorySlotProps> = ({
         <div className={`w-full h-full p-1 flex items-center justify-center ${RARITY_BG_COLORS[item.rarity]} bg-opacity-20 relative pointer-events-none overflow-hidden rounded-[3px]`}>
            
            {/* Icon */}
-           <GameIcon name={item.icon} imageUrl={item.imageUrl} className={`w-8 h-8 ${getRarityTextColor(item.rarity)} drop-shadow-lg z-10`} />
+           <GameIcon name={item.icon} imageUrl={item.imageUrl} className={`w-8 h-8 lg:w-10 lg:h-10 2xl:w-12 2xl:h-12 ${getRarityTextColor(item.rarity)} drop-shadow-lg z-10`} />
            
            {/* Rarity Shine FX */}
            {(item.rarity === 'Unique') && (

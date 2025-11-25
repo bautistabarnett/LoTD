@@ -157,7 +157,7 @@ const SmugglingModal: React.FC<SmugglingModalProps> = ({
                         {purchasedItem.rarity} {purchasedItem.type}
                     </div>
 
-                    <div className="flex gap-4 w-full">
+                    <div className="button-group md:flex md:gap-4 w-full">
                         <button 
                             onClick={handleDiscard}
                             className="flex-1 py-3 border border-stone-600 text-stone-400 hover:bg-stone-800 hover:text-white font-bold uppercase tracking-widest rounded transition-colors text-xs md:text-sm"

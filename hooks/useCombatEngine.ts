@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Monster, PlayerStats, CombatStatusEffect, ActiveEffect, CombatStance, CombatTrigger, LogEntry } from '../types';
-import { COMPOSITE_SYNERGIES, PASSIVE_SET_BONUSES } from '../constants';
+import { Monster, PlayerStats, CombatStatusEffect, ActiveEffect, CombatStance, CombatTrigger, LogEntry, TerrainType, PassiveSkill } from '../types';
+import { COMPOSITE_SYNERGIES, PASSIVE_SET_BONUSES, PASSIVE_SKILLS_POOL } from '../constants';
 import { BALANCE } from '../services/gameBalance';
 import { generateCombatNarrative, generateEncounterDescription } from '../services/geminiService';
 
@@ -12,6 +13,11 @@ interface UseCombatEngineProps {
   onVictory: (monster: Monster) => void;
   onDefeat: () => void;
   addLog: (msg: string, type?: LogEntry['type']) => void;
+  environment?: {
+      terrain: TerrainType;
+      isNight: boolean;
+      activeSkillIds: string[];
+  };
 }
 
 export const generateTurnBatch = (playerAgi: number, enemyAgi: number): ('player' | 'enemy')[] => {
@@ -32,17 +38,20 @@ export const generateTurnBatch = (playerAgi: number, enemyAgi: number): ('player
 const applyStatusEffects = (current: CombatStatusEffect[], incoming: CombatStatusEffect[]): CombatStatusEffect[] => {
     const next = [...current];
     incoming.forEach(inc => {
-        const existingIdx = next.findIndex(e => e.type === inc.type && e.target === inc.target);
+        const existingIdx = next.findIndex(e => e.type === inc.type && e.target === inc.target && e.name === inc.name);
         if (existingIdx >= 0) {
             const existing = next[existingIdx];
             // Determine if this effect type stacks
-            const isHardCC = ['stun', 'freeze', 'shield'].includes(inc.type);
+            const isHardCC = ['stun', 'freeze', 'shield', 'cleanse'].includes(inc.type);
+            
+            // Scaling strength specifically adds value on stack
+            const isScaling = inc.type === 'scaling_strength';
             
             next[existingIdx] = {
                 ...existing,
                 duration: inc.duration, // Refresh duration
                 stacks: isHardCC ? 1 : existing.stacks + 1, // Hard CC/Shield doesn't stack intensity, just refreshes
-                value: Math.max(existing.value, inc.value) // Take the stronger value
+                value: isScaling ? existing.value + inc.value : Math.max(existing.value, inc.value) // Scaling adds, others take max
             };
         } else {
             next.push(inc);
@@ -57,7 +66,8 @@ export const useCombatEngine = ({
   setPlayerHp, 
   onVictory, 
   onDefeat,
-  addLog
+  addLog,
+  environment
 }: UseCombatEngineProps) => {
   const [isFighting, setIsFighting] = useState(false);
   const [activeMonster, setActiveMonster] = useState<Monster | null>(null);
@@ -66,6 +76,10 @@ export const useCombatEngine = ({
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
   const [combatStance, setCombatStance] = useState<CombatStance>(CombatStance.BALANCED);
   const [combatStatusEffects, setCombatStatusEffects] = useState<CombatStatusEffect[]>([]);
+  const [turnCount, setTurnCount] = useState(0);
+  
+  // New: Track Cooldowns for Skills (SkillID -> Turns Remaining)
+  const [skillCooldowns, setSkillCooldowns] = useState<Record<string, number>>({});
 
   const addToCombatLog = (msg: string) => setCombatLog(prev => [...prev, msg]);
 
@@ -77,11 +91,45 @@ export const useCombatEngine = ({
     setTurnQueue(generateTurnBatch(playerStats.dexterity, monster.dexterity));
     setCombatLog([`Encountered ${monster.name} (${monster.rarity})!`]);
     setCombatStatusEffects([]);
+    setSkillCooldowns({});
+    setTurnCount(1);
     setIsFighting(true);
     setCombatStance(CombatStance.BALANCED);
     
+    // Initial Environment Check & Battle Start Triggers
+    if (environment) {
+        const { terrain, isNight, activeSkillIds } = environment;
+        const initEffects: CombatStatusEffect[] = [];
+
+        if (activeSkillIds.includes('night_prowler') && isNight) {
+            addToCombatLog("🌑 Nightstalker active! Crit Chance increased.");
+        }
+
+        if (activeSkillIds.includes('tidal_affinity') && (terrain === TerrainType.SWAMP)) {
+            addToCombatLog("🌊 Tidal Affinity: Regenerating in the swamp.");
+            initEffects.push({
+                id: 'tidal-regen', type: 'regen', name: 'Tidal Ward', duration: 10, value: 0.05, stacks: 1, source: 'environment', target: 'player', description: 'Swamp Healing'
+            });
+        }
+        
+        // Handle Void Form (Dodge Boost on Start)
+        if (activeSkillIds.includes('void_form')) {
+             const skill = PASSIVE_SKILLS_POOL.find(s => s.id === 'void_form');
+             if(skill) {
+                 addToCombatLog(`🌌 ${skill.name} activates! Ethereal form entered.`);
+                 initEffects.push({
+                    id: 'void-form', type: 'dodge_boost' as any, name: 'Void Form', duration: 2, value: 50, stacks: 1, source: 'skill', target: 'player', description: '+50% Dodge'
+                });
+             }
+        }
+        
+        if (initEffects.length > 0) {
+            setCombatStatusEffects(prev => applyStatusEffects(prev, initEffects));
+        }
+    }
+    
     generateEncounterDescription(monster, level).then(addToCombatLog);
-  }, [playerStats, setPlayerHp]);
+  }, [playerStats, setPlayerHp, environment]);
 
   // --- DYNAMIC AGILITY RECALC ---
   useEffect(() => {
@@ -110,8 +158,22 @@ export const useCombatEngine = ({
       const newEffects: CombatStatusEffect[] = [];
       let triggerDamage = 0;
 
-      // 1. PLAYER PASSIVES
+      // 1. PLAYER PASSIVES & SKILLS
       if (actor === 'player') {
+          // Environmental Triggers
+          if (environment) {
+              const { terrain, activeSkillIds } = environment;
+              if (trigger === 'onHit' && activeSkillIds.includes('forest_fire') && terrain === TerrainType.FOREST) {
+                   if (Math.random() < 0.4) {
+                       newEffects.push({
+                           id: `wildfire-${Date.now()}`, type: 'burn', name: 'Wildfire', duration: 3, value: 0.1, stacks: 1, source: 'environment', target: 'enemy', description: 'Forest fueling fire'
+                       });
+                       addToCombatLog("🌲🔥 Wildfire spreads in the forest!");
+                   }
+              }
+          }
+
+          // A. Set Bonuses
           playerStats.activeSetBonuses.forEach(theme => {
               const bonus = PASSIVE_SET_BONUSES.find(b => b.theme === theme);
               if (bonus && bonus.triggerCondition === trigger && Math.random() < bonus.procChance) {
@@ -133,6 +195,109 @@ export const useCombatEngine = ({
               }
           });
 
+          // B. Complex Skill Procs (Cooldowns, Costs, Conditions)
+          const equippedSkills = PASSIVE_SKILLS_POOL.filter(s => playerStats.equippedSkillIds.includes(s.id));
+          
+          equippedSkills.forEach(skill => {
+              if (skill.proc && skill.proc.trigger === trigger) {
+                  // 1. Check Cooldown
+                  if ((skillCooldowns[skill.id] || 0) > 0) return;
+                  
+                  // 2. Check Chance
+                  if (Math.random() > skill.proc.chance) return;
+
+                  // 3. Check Conditions
+                  if (skill.proc.conditions) {
+                      const conditionsMet = skill.proc.conditions.every(cond => {
+                          if (cond.type === 'hp_below') return (playerHp / playerStats.maxHp) < Number(cond.value);
+                          if (cond.type === 'hp_above') return (playerHp / playerStats.maxHp) > Number(cond.value);
+                          if (cond.type === 'enemy_hp_below') return activeMonster ? (activeMonster.currentHp / activeMonster.maxHp) < Number(cond.value) : false;
+                          if (cond.type === 'turn_count_multiple') return (turnCount % Number(cond.value)) === 0;
+                          return true;
+                      });
+                      if (!conditionsMet) return;
+                  }
+
+                  // 4. Pay Cost (If applicable)
+                  if (skill.proc.cost) {
+                      let costVal = 0;
+                      if (skill.proc.cost.type === 'hp_percent') costVal = Math.floor(playerStats.maxHp * skill.proc.cost.value);
+                      if (skill.proc.cost.type === 'hp_flat') costVal = skill.proc.cost.value;
+                      
+                      if (playerHp <= costVal) return; // Cannot pay cost
+                      
+                      setPlayerHp(prev => Math.max(1, prev - costVal));
+                      addToCombatLog(`🩸 ${skill.name} sacrifices ${costVal} HP!`);
+                  }
+
+                  // 5. Apply Effect
+                  const eff = skill.proc.effect;
+                  
+                  if (eff.type === 'multi_hit') {
+                       // Chained Attack: Immediate Damage
+                       const chainedDmg = Math.floor(damageDealt * eff.value);
+                       triggerDamage += chainedDmg;
+                       if (activeMonster) setActiveMonster(prev => prev ? { ...prev, currentHp: prev.currentHp - chainedDmg } : null);
+                       addToCombatLog(`⚔️ ${skill.name}: Echo strike for ${chainedDmg}!`);
+                  } 
+                  else if (eff.type === 'damage_phys' || eff.type === 'damage_magic') {
+                       const dmg = Math.floor(playerStats.damage * eff.value);
+                       triggerDamage += dmg;
+                       if (activeMonster) setActiveMonster(prev => prev ? { ...prev, currentHp: prev.currentHp - dmg } : null);
+                       addToCombatLog(`⚡ ${skill.name} triggers for ${dmg} damage!`);
+                  }
+                  else if (eff.type === 'heal') {
+                       // Immediate Heal (e.g., Apex Predator)
+                       const healVal = Math.floor(playerStats.maxHp * eff.value);
+                       setPlayerHp(prev => Math.min(playerStats.maxHp, prev + healVal));
+                       addToCombatLog(`💚 ${skill.name} heals you for ${healVal}!`);
+                  }
+                  else if (eff.type === 'cleanse') {
+                       // Remove all debuffs from player
+                       setCombatStatusEffects(prev => prev.filter(e => e.target !== 'player' || !['burn','poison','freeze','blind','chill','stun'].includes(e.type)));
+                       addToCombatLog(`✨ ${skill.name} purifies you!`);
+                  }
+                  else if (eff.type === 'buff' || eff.type === 'debuff') {
+                      let target: 'player' | 'enemy' = 'player';
+                      if (eff.type === 'debuff') target = 'enemy';
+                      if (eff.subType === 'burn' || eff.subType === 'poison') target = 'enemy';
+                      
+                      newEffects.push({
+                          id: `${skill.id}-${Date.now()}`,
+                          type: (eff.subType || 'buff') as any, // Cast to any to fit types loosely
+                          name: skill.name,
+                          duration: eff.duration || 3,
+                          value: eff.value,
+                          stacks: 1,
+                          source: 'skill',
+                          target: target,
+                          description: skill.proc.description
+                      });
+                      addToCombatLog(`✨ ${skill.name} activates!`);
+                  }
+                  else if (eff.type === 'shield') {
+                       newEffects.push({
+                          id: `${skill.id}-${Date.now()}`,
+                          type: 'shield',
+                          name: skill.name,
+                          duration: eff.duration || 1,
+                          value: eff.value,
+                          stacks: 1,
+                          source: 'skill',
+                          target: 'player',
+                          description: 'Shielded'
+                      });
+                      addToCombatLog(`🛡️ ${skill.name} shields you!`);
+                  }
+
+                  // 6. Set Cooldown
+                  if (skill.proc.cooldown > 0) {
+                      setSkillCooldowns(prev => ({ ...prev, [skill.id]: skill.proc.cooldown }));
+                  }
+              }
+          });
+
+          // C. Synergies
           playerStats.activeSynergies.forEach(synId => {
               const synergy = COMPOSITE_SYNERGIES.find(s => s.id === synId);
               if (synergy && synergy.effect.trigger === trigger) {
@@ -155,55 +320,29 @@ export const useCombatEngine = ({
       // 2. ENEMY MALEDICTS (Active)
       if (actor === 'enemy') {
           activeMonster.maledicts.forEach(m => {
-              // Standard Trigger Check
               if (m.trigger === trigger) {
-                  // Maledict Specific Logic Mapped from Type/ID
-                  if (m.id === 'arcane' && m.triggerEffect?.type === 'reflect') {
+                  // Existing maledict logic preserved...
+                   if (m.id === 'arcane' && m.triggerEffect?.type === 'reflect') {
                        newEffects.push({
-                           id: `arcane-shield-${Date.now()}`,
-                           type: 'shield',
-                           name: 'Arcane Shield',
-                           duration: 1,
-                           value: 1,
-                           stacks: 1,
-                           source: 'maledict',
-                           target: 'enemy',
-                           description: 'Nullifies the next hit.'
+                           id: `arcane-shield-${Date.now()}`, type: 'shield', name: 'Arcane Shield', duration: 1, value: 1, stacks: 1, source: 'maledict', target: 'enemy', description: 'Nullifies next hit.'
                        });
                        addToCombatLog(`✨ ${m.name} activates!`);
                   }
                   else if (m.id === 'plague' && m.triggerEffect?.type === 'ground_hazard') {
                       newEffects.push({
-                           id: `plague-${Date.now()}`,
-                           type: 'poison',
-                           name: 'Plague Cloud',
-                           duration: 3,
-                           value: m.triggerEffect.value,
-                           stacks: 1,
-                           source: 'maledict',
-                           target: 'player',
-                           description: 'Poisoned by the air.'
+                           id: `plague-${Date.now()}`, type: 'poison', name: 'Plague Cloud', duration: 3, value: m.triggerEffect.value, stacks: 1, source: 'maledict', target: 'player', description: 'Poisoned.'
                        });
                        addToCombatLog(`🤢 ${m.name} surrounds you!`);
                   }
                   else if (m.triggerEffect && Math.random() < m.triggerEffect.chance) {
                        const eff = m.triggerEffect;
-                       
                        if (eff.type === 'shuffle_turn') {
-                           addToCombatLog(`⏳ ${m.name}: Time distorted! Turn queue shuffled.`);
+                           addToCombatLog(`⏳ ${m.name}: Turn queue shuffled.`);
                            setTurnQueue(prev => [...prev].sort(() => Math.random() - 0.5));
                        }
                        if (eff.type === 'debuff_player') {
                            newEffects.push({
-                               id: Date.now() + Math.random().toString(),
-                               type: 'burn', 
-                               name: m.name,
-                               duration: 3,
-                               value: eff.value,
-                               stacks: 1,
-                               source: 'maledict',
-                               target: 'player',
-                               description: 'Burned by Molten skin'
+                               id: Date.now() + Math.random().toString(), type: 'burn', name: m.name, duration: 3, value: eff.value, stacks: 1, source: 'maledict', target: 'player', description: 'Burned.'
                            });
                            addToCombatLog(`🔥 ${m.name} burns you!`);
                        }
@@ -218,16 +357,9 @@ export const useCombatEngine = ({
                 if (m.trigger === 'onTakeDamage' && m.triggerEffect && Math.random() < m.triggerEffect.chance) {
                      if (m.triggerEffect.type === 'debuff_player') {
                           newEffects.push({
-                              id: Date.now() + Math.random().toString(),
-                              type: 'burn',
-                              name: m.name,
-                              duration: 2,
-                              value: m.triggerEffect.value,
-                              stacks: 1,
-                              source: 'maledict',
-                              target: 'player'
+                              id: Date.now() + Math.random().toString(), type: 'burn', name: m.name, duration: 2, value: m.triggerEffect.value, stacks: 1, source: 'maledict', target: 'player'
                           });
-                          addToCombatLog(`⚠️ ${m.name} reacts to your hit!`);
+                          addToCombatLog(`⚠️ ${m.name} reacts!`);
                      }
                 }
            });
@@ -273,6 +405,16 @@ export const useCombatEngine = ({
   const resolveCombatTurn = () => {
     if (!activeMonster || !playerStats) return;
     
+    // Decrease skill cooldowns at start of player turn
+    setSkillCooldowns(prev => {
+        const next = { ...prev };
+        Object.keys(next).forEach(k => {
+            if (next[k] > 0) next[k] -= 1;
+            if (next[k] <= 0) delete next[k];
+        });
+        return next;
+    });
+
     const isFrozen = combatStatusEffects.some(e => e.target === 'player' && (e.type === 'freeze' || e.type === 'stun'));
     if (isFrozen) {
         addToCombatLog("You are Frozen/Stunned and cannot act!");
@@ -291,14 +433,30 @@ export const useCombatEngine = ({
     let monsterHp = activeMonster.currentHp - synergyDmg;
     
     // Thorns Calculation
-    if (activeMonster.thorns > 0 && !isShielded) { // Shield blocks hit, implies no contact damage? Assuming thorns requires damage.
+    if (activeMonster.thorns > 0 && !isShielded) { 
         const thorn = Math.floor(playerStats.damage * (activeMonster.thorns / 100));
         setPlayerHp(p => p - thorn);
         addToCombatLog(`Thorns: Took ${thorn} dmg.`);
     }
 
-    let rawDmg = playerStats.damage * (0.8 + Math.random() * 0.4);
+    // SCALING STRENGTH BUFF
+    const scalingStrength = combatStatusEffects.find(e => e.target === 'player' && e.type === 'scaling_strength');
+    let dynamicStr = 0;
+    if (scalingStrength) {
+        dynamicStr = scalingStrength.value;
+        // Visual log only on high stacks or first app to avoid spam
+        if (dynamicStr === 5 || dynamicStr % 15 === 0) addToCombatLog(`💪 Scaling Strength: +${dynamicStr} Dmg`);
+    }
+
+    let rawDmg = (playerStats.damage + dynamicStr) * (0.8 + Math.random() * 0.4);
     
+    // Environmental Bonus
+    if (environment) {
+        if (environment.activeSkillIds.includes('forest_fire') && environment.terrain === TerrainType.FOREST) {
+            rawDmg *= 1.2;
+        }
+    }
+
     const stanceMult = BALANCE.COMBAT.stanceMultipliers[combatStance] || BALANCE.COMBAT.stanceMultipliers[CombatStance.BALANCED];
     rawDmg *= stanceMult.damage;
 
@@ -315,7 +473,12 @@ export const useCombatEngine = ({
     const critBoost = combatStatusEffects.find(e => e.type === 'crit_boost');
     if (critBoost) critMult += (critBoost.value / 100);
 
-    const isCrit = Math.random() * 100 < playerStats.critChance;
+    let finalCritChance = playerStats.critChance;
+    if (environment && environment.isNight && environment.activeSkillIds.includes('night_prowler')) {
+        finalCritChance += 25;
+    }
+
+    const isCrit = Math.random() * 100 < finalCritChance;
     if (isCrit) rawDmg *= critMult;
 
     const onAttackDmg = processTriggers('onAttack', 'player');
@@ -324,11 +487,9 @@ export const useCombatEngine = ({
     const mitigation = activeMonster.armor * 0.5;
     let dmg = Math.max(1, Math.floor(rawDmg - mitigation));
     
-    // ARCANE SHIELD CHECK
     if (isShielded) {
         dmg = 0;
         addToCombatLog(`🚫 Blocked by ${activeMonster.name}'s Shield!`);
-        // Remove shield
         setCombatStatusEffects(prev => prev.filter(e => !(e.target === 'enemy' && e.type === 'shield')));
     } else {
         monsterHp -= dmg;
@@ -341,13 +502,17 @@ export const useCombatEngine = ({
             generateCombatNarrative(activeMonster.name, 'Attack', 'crit').then(t => addToCombatLog(`> ${t}`));
         } else addToCombatLog(`Hit for ${dmg}.`);
 
-        if (playerStats.lifeSteal > 0) {
-            const heal = Math.floor(dmg * (playerStats.lifeSteal / 100));
+        let lifeStealVal = playerStats.lifeSteal;
+        if (environment && environment.activeSkillIds.includes('grave_born') && (environment.terrain === TerrainType.CRYPT || environment.terrain === TerrainType.RUINS)) {
+            lifeStealVal += 15;
+        }
+
+        if (lifeStealVal > 0) {
+            const heal = Math.floor(dmg * (lifeStealVal / 100));
             setPlayerHp(p => Math.min(playerStats.maxHp, p + heal));
         }
     }
 
-    // Create updated monster object for checking death
     const updatedMonster = { ...activeMonster, currentHp: monsterHp };
     setActiveMonster(updatedMonster);
 
@@ -373,7 +538,12 @@ export const useCombatEngine = ({
 
       if (activeMonster.currentHp <= 0) { handleVictoryInternal(activeMonster); return; }
 
-      const isDodge = Math.random() * 100 < playerStats.dodgeChance;
+      let dodgeChance = playerStats.dodgeChance;
+      // Apply Dodge Boost Buffs (e.g. Void Form)
+      const dodgeBoost = combatStatusEffects.find(e => e.target === 'player' && e.type === 'dodge_boost');
+      if (dodgeBoost) dodgeChance += dodgeBoost.value;
+
+      const isDodge = Math.random() * 100 < dodgeChance;
       if (isDodge) {
           addToCombatLog("DODGED!");
           return;
@@ -381,9 +551,7 @@ export const useCombatEngine = ({
 
       let dmg = activeMonster.damage * (0.8 + Math.random() * 0.4);
       
-      // EXECUTIONER LOGIC
       if (activeMonster.maledicts.some(m => m.id === 'executioner')) {
-           // Threshold check: 30% of max HP
            if (playerHp < playerStats.maxHp * 0.3) {
                 dmg *= 2;
                 addToCombatLog("🪓 Executioner: DOUBLE DAMAGE!");
@@ -398,19 +566,29 @@ export const useCombatEngine = ({
       mit *= stanceMult.mitigation;
 
       const final = Math.max(1, Math.floor(dmg - mit));
-      setPlayerHp(p => p - final);
       
-      processTriggers('onHit', 'enemy', final);
-      processTriggers('onTakeDamage', 'player');
+      // Check for Player Shield (Mana Shield)
+      const playerShield = combatStatusEffects.find(e => e.target === 'player' && e.type === 'shield');
+      let damageTaken = final;
+      
+      if (playerShield) {
+          damageTaken = 0;
+          addToCombatLog(`🛡️ Your shield absorbs the hit!`);
+          setCombatStatusEffects(prev => prev.filter(e => !(e.target === 'player' && e.type === 'shield')));
+      } else {
+          setPlayerHp(p => p - damageTaken);
+          processTriggers('onHit', 'enemy', damageTaken);
+          processTriggers('onTakeDamage', 'player'); // Triggers reactive skills here
+      }
 
-      if (activeMonster.lifeSteal > 0) {
-          const heal = Math.floor(final * (activeMonster.lifeSteal/100));
+      if (activeMonster.lifeSteal > 0 && damageTaken > 0) {
+          const heal = Math.floor(damageTaken * (activeMonster.lifeSteal/100));
           setActiveMonster(p => p ? { ...p, currentHp: Math.min(p.maxHp, p.currentHp + heal) } : null);
       }
 
-      addToCombatLog(`${activeMonster.name} hits for ${final}.`);
+      if(damageTaken > 0) addToCombatLog(`${activeMonster.name} hits for ${damageTaken}.`);
       
-      if (playerHp - final <= 0) handleDefeatInternal();
+      if (playerHp - damageTaken <= 0) handleDefeatInternal();
   };
 
   const handleVictoryInternal = (monster: Monster) => {
@@ -419,6 +597,7 @@ export const useCombatEngine = ({
      setActiveMonster(null);
      setCombatStatusEffects([]);
      setTurnQueue([]);
+     setSkillCooldowns({});
   };
 
   const handleDefeatInternal = () => {
@@ -427,6 +606,7 @@ export const useCombatEngine = ({
       setActiveMonster(null);
       setTurnQueue([]);
       setCombatStatusEffects([]);
+      setSkillCooldowns({});
   };
 
   const handleFlee = () => { 
@@ -448,6 +628,9 @@ export const useCombatEngine = ({
 
     const currentActor = turnQueue[0];
     setIsPlayerTurn(currentActor === 'player');
+    
+    // Increment global turn counter for 'every X turns' logic logic
+    if (currentActor === 'player') setTurnCount(prev => prev + 1);
 
     const timer = setTimeout(() => {
         if (!isFighting) return;

@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Item } from '../types';
 import { RARITY_COLORS } from '../constants';
@@ -75,26 +74,46 @@ const ItemCard = ({ item, label, isEquipped }: { item: Item; label?: string, isE
 };
 
 const Tooltip: React.FC<TooltipProps> = ({ item, comparedItem, position }) => {
+  const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const isRightSide = position.x > window.innerWidth * 0.6;
-  const isBottomHalf = position.y > viewportHeight * 0.6;
+  
+  // Calculate Base Position
+  let left = position.x + 15;
+  let top = position.y + 10;
+  
+  // Strict Horizontal Clamp
+  // Tooltip width is roughly 288px (w-72), let's allow some margin
+  // If the calculated left + width > viewport, shift it left
+  if (left + 290 > viewportWidth) {
+      left = viewportWidth - 300;
+  }
+  
+  // Ensure it doesn't go off the left edge
+  left = Math.max(8, left);
+  
+  // Boundary check Bottom (tooltip height ~400px worst case with comparison)
+  // If too low, flip to top
+  if (top + 400 > viewportHeight) {
+      top = Math.max(10, position.y - 410);
+  }
 
   const style: React.CSSProperties = {
     position: 'fixed',
     zIndex: 100,
-    left: isRightSide ? 'auto' : position.x + 15,
-    right: isRightSide ? (window.innerWidth - position.x) + 15 : 'auto',
-    top: isBottomHalf ? 'auto' : position.y + 10,
-    bottom: isBottomHalf ? (window.innerHeight - position.y) + 10 : 'auto',
+    left: left,
+    top: top,
+    maxWidth: '96vw', // Ensure slightly wider on mobile just in case
+    maxHeight: '90vh',
+    overflowY: 'auto'
   };
 
   return (
     <div
-      className="pointer-events-none flex gap-2 items-start animate-in fade-in duration-150"
+      className="pointer-events-none flex flex-col md:flex-row gap-2 items-start animate-in fade-in duration-150 tooltip-card"
       style={style}
     >
       <ItemCard item={item} />
-      {comparedItem && <ItemCard item={comparedItem} label="Currently Equipped" isEquipped />}
+      {comparedItem && <ItemCard item={comparedItem} label="Equipped" isEquipped />}
     </div>
   );
 };
