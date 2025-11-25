@@ -1,4 +1,5 @@
 
+
 import { Rarity, MonsterRarity, Item, ItemSlot, StatType, CombatStance } from '../types';
 
 export const BALANCE = {
@@ -17,6 +18,7 @@ export const BALANCE = {
     perLevel: {
       hp: 10,
       statPoints: 3,
+      skillPoints: 1, // New: 1 point per level to spend in tree
     }
   },
   

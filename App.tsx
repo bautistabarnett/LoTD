@@ -1,10 +1,8 @@
-
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Item, ItemSlot, PlayerStats, EquipmentMap, LogEntry, Rarity, Monster, BaseAttributes, PassiveSkill, MapNode, ExplorationEvent, ActiveEffect, EventType, CombatStatusEffect, CombatStance, MonsterRarity, CombatTrigger, SaveData, BuildLoadout } from './types';
 import { generateLoot, calculatePlayerStats, generateMonster, generatePassiveSkill, calculateItemValue } from './services/gameLogic';
 import { identifyItemWithGemini, generateEncounterDescription, generatePassiveLore, generateCombatNarrative, generateImage } from './services/geminiService';
-import { RARITY_COLORS, SLOT_ICONS, MAX_INVENTORY_SIZE, INITIAL_WORLD_MAP, EXPLORATION_EVENTS, PASSIVE_SET_BONUSES, COMPOSITE_SYNERGIES } from './constants';
+import { RARITY_COLORS, SLOT_ICONS, MAX_INVENTORY_SIZE, INITIAL_WORLD_MAP, EXPLORATION_EVENTS, PASSIVE_SET_BONUSES, COMPOSITE_SYNERGIES, PASSIVE_SKILLS_POOL } from './constants';
 import { BALANCE } from './services/gameBalance';
 import { storageService } from './services/storageService';
 import InventorySlot from './components/InventorySlot';
@@ -39,6 +37,7 @@ export default function App() {
     intelligence: BALANCE.STATS.base.intelligence, vitality: BALANCE.STATS.base.vitality
   });
   const [statPoints, setStatPoints] = useState(0);
+  const [skillPoints, setSkillPoints] = useState(0); // New state for tree currency
   const [passiveSkills, setPassiveSkills] = useState<PassiveSkill[]>([]);
   const [equippedSkillIds, setEquippedSkillIds] = useState<string[]>([]); 
   const [buildLoadouts, setBuildLoadouts] = useState<BuildLoadout[]>([]);
@@ -82,17 +81,21 @@ export default function App() {
   // New State for Skill Reward
   const [skillReward, setSkillReward] = useState<{ skill: PassiveSkill, isNew: boolean } | null>(null);
 
+  const addLog = useCallback((msg: string, type: LogEntry['type'] = 'system') => {
+      setLogs(prev => [{ id: Date.now(), message: msg, type, timestamp: Date.now() }, ...prev].slice(30));
+  }, []);
+
   // --- SAVE / LOAD LOGIC ---
   const handleSaveGame = useCallback(() => {
       const saveData: SaveData = {
-          level, xp, gold, baseAttributes, statPoints, passiveSkills, activeEffects,
+          level, xp, gold, baseAttributes, statPoints, skillPoints, passiveSkills, activeEffects,
           inventory, equipment, mapNodes, currentAreaId, areaProgress, worldDifficulty,
           merchantStock, groundItems, heroImageUrl, timestamp: Date.now(),
           equippedSkillIds, buildLoadouts
       };
       storageService.saveGame(currentSlotId, saveData);
       addLog("Game Saved.", 'system');
-  }, [level, xp, gold, baseAttributes, statPoints, passiveSkills, activeEffects, inventory, equipment, mapNodes, currentAreaId, areaProgress, worldDifficulty, merchantStock, groundItems, heroImageUrl, currentSlotId, equippedSkillIds, buildLoadouts]);
+  }, [level, xp, gold, baseAttributes, statPoints, skillPoints, passiveSkills, activeEffects, inventory, equipment, mapNodes, currentAreaId, areaProgress, worldDifficulty, merchantStock, groundItems, heroImageUrl, currentSlotId, equippedSkillIds, buildLoadouts, addLog]);
 
   const handleLoadGame = useCallback((slotId: number) => {
       const data = storageService.loadGame(slotId);
@@ -103,6 +106,7 @@ export default function App() {
       setGold(data.gold);
       setBaseAttributes(data.baseAttributes);
       setStatPoints(data.statPoints);
+      setSkillPoints(data.skillPoints || 0);
       setPassiveSkills(data.passiveSkills);
       if (!data.equippedSkillIds && data.passiveSkills.length > 0) {
           setEquippedSkillIds(data.passiveSkills.slice(0, 6).map(s => s.id));
@@ -135,6 +139,7 @@ export default function App() {
         intelligence: BALANCE.STATS.base.intelligence, vitality: BALANCE.STATS.base.vitality
       });
       setStatPoints(0);
+      setSkillPoints(0);
       setPassiveSkills([]);
       setEquippedSkillIds([]);
       setBuildLoadouts([]);
@@ -164,7 +169,7 @@ export default function App() {
            const initialSave: SaveData = {
               level: 1, xp: 0, gold: 0, 
               baseAttributes: { strength: BALANCE.STATS.base.strength, dexterity: BALANCE.STATS.base.dexterity, intelligence: BALANCE.STATS.base.intelligence, vitality: BALANCE.STATS.base.vitality },
-              statPoints: 0, passiveSkills: [], activeEffects: [], inventory: Array(MAX_INVENTORY_SIZE).fill(null), equipment: {}, 
+              statPoints: 0, skillPoints: 0, passiveSkills: [], activeEffects: [], inventory: Array(MAX_INVENTORY_SIZE).fill(null), equipment: {}, 
               mapNodes: INITIAL_WORLD_MAP, currentAreaId: 'town', areaProgress: 0, worldDifficulty: 1.0, merchantStock: s, groundItems: [], timestamp: Date.now(),
               equippedSkillIds: [], buildLoadouts: []
            };
@@ -189,8 +194,9 @@ export default function App() {
     xp,
     xpToNextLevel: level * 100,
     gold,
+    skillPoints,
     heroImageUrl
-  }), [derivedStats, xp, level, gold, heroImageUrl]);
+  }), [derivedStats, xp, level, gold, skillPoints, heroImageUrl]);
 
   const handleEquipSkill = useCallback((skillId: string) => {
       setEquippedSkillIds(prev => {
@@ -203,6 +209,51 @@ export default function App() {
   const handleUnequipSkill = useCallback((skillId: string) => {
       setEquippedSkillIds(prev => prev.filter(id => id !== skillId));
   }, []);
+  
+  const handleUnlockTreeSkill = useCallback((skillId: string) => {
+      if (skillPoints <= 0) {
+          addLog("Not enough Skill Points!", 'system');
+          return;
+      }
+      
+      const poolSkill = PASSIVE_SKILLS_POOL.find(s => s.id === skillId);
+      if (!poolSkill) return;
+
+      const existingSkill = passiveSkills.find(s => s.id === skillId);
+      
+      // Check Prereqs
+      if (poolSkill.prerequisiteId) {
+          const parent = passiveSkills.find(s => s.id === poolSkill.prerequisiteId);
+          if (!parent) {
+              addLog("Prerequisite not met!", 'system');
+              return;
+          }
+      }
+
+      setSkillPoints(prev => prev - 1);
+      
+      if (existingSkill) {
+          // Upgrade
+          if (existingSkill.level >= (existingSkill.maxRank || 5)) return; // Max rank check
+          
+          const nextLevel = existingSkill.level + 1;
+          const upgraded = { ...existingSkill, level: nextLevel, value: existingSkill.baseValue + (nextLevel - 1) * existingSkill.valuePerLevel };
+          
+          setPassiveSkills(prev => prev.map(p => p.id === skillId ? upgraded : p));
+          addLog(`Upgraded ${existingSkill.name} to Rank ${nextLevel}`, 'system');
+      } else {
+          // Unlock
+          const newSkill = { ...poolSkill, level: 1, value: poolSkill.baseValue };
+          setPassiveSkills(prev => [...prev, newSkill]);
+          addLog(`Learned ${newSkill.name}`, 'system');
+          
+          // Auto-equip if space
+          setEquippedSkillIds(prev => {
+             if (prev.length < 6) return [...prev, newSkill.id];
+             return prev;
+          });
+      }
+  }, [skillPoints, passiveSkills, addLog]);
 
   const handleSaveBuild = useCallback((name: string) => {
       const loadout: BuildLoadout = {
@@ -213,12 +264,12 @@ export default function App() {
       };
       setBuildLoadouts(prev => [loadout, ...prev].slice(0, 5)); 
       addLog(`Build "${name}" saved.`, 'system');
-  }, [equippedSkillIds]);
+  }, [equippedSkillIds, addLog]);
 
   const handleLoadBuild = useCallback((loadout: BuildLoadout) => {
       setEquippedSkillIds(loadout.equippedSkillIds);
       addLog(`Loaded build "${loadout.name}"`, 'system');
-  }, []);
+  }, [addLog]);
 
   const handleRespecAttributes = useCallback(() => {
       const resetCost = level * 100;
@@ -237,11 +288,7 @@ export default function App() {
       setStatPoints(totalPoints);
       setGold(p => p - resetCost);
       addLog("Attributes reset. Points refunded.", 'system');
-  }, [gold, level]);
-
-  const addLog = useCallback((msg: string, type: LogEntry['type'] = 'system') => {
-      setLogs(prev => [{ id: Date.now(), message: msg, type, timestamp: Date.now() }, ...prev].slice(30));
-  }, []);
+  }, [gold, level, addLog]);
 
   const addToInventory = useCallback((item: Item): boolean => {
     let success = false;
@@ -287,8 +334,9 @@ export default function App() {
     setLevel(newLevel); 
     setXp(overflowXp); 
     setStatPoints(prev => prev + BALANCE.STATS.perLevel.statPoints);
+    setSkillPoints(prev => prev + BALANCE.STATS.perLevel.skillPoints); // New: Award Skill Point
     
-    // Normal level up gives Common skills usually
+    // Normal level up still generates a random passive option via modal
     const res = generatePassiveSkill(passiveSkills, { excludeRarities: [Rarity.UNIQUE] }); 
     setLastGainedPassive(res);
     setPassiveFlavorText("..."); 
@@ -737,7 +785,7 @@ export default function App() {
       );
   }
 
-  // Main Responsive Container with new 'container-principal' class for mobile responsiveness
+  // Main Responsive Container
   return (
     <div className="container-principal relative w-full h-full bg-[#0c0a09] shadow-2xl overflow-hidden flex flex-col md:grid md:grid-cols-12 panel-border text-sm lg:text-base">
       {hoverItem && <Tooltip item={hoverItem} comparedItem={equipment[hoverItem.type]} position={cursorPos} />}
@@ -745,7 +793,7 @@ export default function App() {
       {showLevelUpModal && lastGainedPassive && <LevelUpModal newPassive={lastGainedPassive.skill} isUpgrade={!lastGainedPassive.isNew} pointsAvailable={statPoints} baseAttributes={baseAttributes} flavorText={passiveFlavorText} onAllocate={handleAllocatePoint} onClose={() => setShowLevelUpModal(false)} />}
       {showMapModal && <WorldMapModal nodes={mapNodes} currentNodeId={currentAreaId} areaProgress={areaProgress} onTravel={handleTravel} onClose={() => setShowMapModal(false)} />}
       {showSmugglingModal && <SmugglingModal gold={gold} onPurchase={(c) => setGold(p => p - c)} onGenerateLoot={(d) => generateLoot(level, d, stats.magicFind||0)} onClose={() => setShowSmugglingModal(false)} addToInventory={addToInventory} />}
-      {showSkillsModal && <SkillsModal passiveSkills={passiveSkills} activeEffects={activeEffects} equippedSkillIds={equippedSkillIds} buildLoadouts={buildLoadouts} playerStats={stats} onEquip={handleEquipSkill} onUnequip={handleUnequipSkill} onSaveBuild={handleSaveBuild} onLoadBuild={handleLoadBuild} onRespecAttributes={handleRespecAttributes} onClose={() => setShowSkillsModal(false)} />}
+      {showSkillsModal && <SkillsModal passiveSkills={passiveSkills} activeEffects={activeEffects} equippedSkillIds={equippedSkillIds} buildLoadouts={buildLoadouts} playerStats={stats} onEquip={handleEquipSkill} onUnequip={handleUnequipSkill} onUnlockTreeSkill={handleUnlockTreeSkill} onSaveBuild={handleSaveBuild} onLoadBuild={handleLoadBuild} onRespecAttributes={handleRespecAttributes} onClose={() => setShowSkillsModal(false)} />}
       {showStatsModal && <StatsModal stats={stats} baseAttributes={baseAttributes} statPoints={statPoints} passiveSkills={passiveSkills} onAllocate={handleAllocatePoint} onClose={() => setShowStatsModal(false)} />}
       {(visualizingItem || isVisualizingHero) && <VisualizerModal target={isVisualizingHero ? { name: "Hero", type: "Hero", imageUrl: heroImageUrl, icon: "hero" } : visualizingItem} onSave={handleSaveVisual} onClose={() => { setVisualizingItem(null); setIsVisualizingHero(false); }} />}
       {showSystemModal && <SystemModal currentSlotId={currentSlotId} onSave={handleSaveGame} onQuit={() => setGameStatus('MENU')} onOpenBalance={() => setShowBalanceModal(true)} onClose={() => setShowSystemModal(false)} />}
@@ -776,7 +824,7 @@ export default function App() {
           />
       )}
 
-      {/* LEFT PANEL: Character (Responsive Cols) */}
+      {/* LEFT PANEL: Character */}
       <div className={`col-span-12 md:col-span-4 lg:col-span-3 bg-texture-leather border-r border-[#292524] relative flex-col z-10 shadow-xl overflow-hidden ${activeTab === 'hero' ? 'flex flex-1 min-h-0' : 'hidden md:flex'}`}>
           <div className="h-full flex flex-col p-4 overflow-y-auto">
               <h2 className="text-xl lg:text-2xl text-gold-gradient diablo-font text-center mb-4 tracking-widest border-b border-stone-800 pb-2">
@@ -817,7 +865,7 @@ export default function App() {
           </div>
       </div>
 
-      {/* CENTER PANEL: Adventure (Responsive Cols) */}
+      {/* CENTER PANEL: Adventure */}
       <div className={`col-span-12 md:col-span-5 lg:col-span-6 flex-col bg-texture-stone relative z-0 shadow-inner ${activeTab === 'adventure' ? 'flex flex-1 min-h-0' : 'hidden md:flex'}`}>
           {/* Header */}
           <div className="h-16 shrink-0 bg-stone-950/90 border-b border-stone-800 flex items-center justify-between px-6 backdrop-blur-sm z-20">
@@ -852,7 +900,7 @@ export default function App() {
           {/* Main Content Area */}
           <div className="flex-grow relative overflow-hidden flex flex-col p-4 gap-4 min-h-0">
               
-              {/* Ground Items (Horizontal Scroll) */}
+              {/* Ground Items */}
               {groundItems.length > 0 && (
                 <div className="shrink-0 h-16 lg:h-20 bg-black/40 border border-stone-800 rounded flex items-center px-2 gap-2 overflow-x-auto custom-scrollbar">
                    <span className="text-[10px] text-stone-500 uppercase font-bold mr-2 shrink-0">Ground:</span>
@@ -864,7 +912,7 @@ export default function App() {
                 </div>
               )}
 
-              {/* Adventure Log - Resizes Dynamically */}
+              {/* Adventure Log */}
               <div className="flex-grow border border-stone-800 bg-black/20 rounded p-4 overflow-y-auto custom-scrollbar font-mono text-xs lg:text-sm 2xl:text-base space-y-1 shadow-inner">
                   {logs.map((log) => (
                       <div key={log.id} className={`${log.type === 'combat' ? 'text-red-400' : log.type === 'loot' ? 'text-amber-400' : log.type === 'event' ? 'text-blue-300' : 'text-stone-500'} border-b border-white/5 pb-1 mb-1`}>
@@ -875,7 +923,7 @@ export default function App() {
                   {logs.length === 0 && <div className="text-stone-600 italic text-center mt-10">The journey begins...</div>}
               </div>
 
-              {/* Bottom Controls with new 'button-group' class for vertical layout on mobile */}
+              {/* Bottom Controls */}
               <div className="button-group h-auto md:h-12 lg:h-14 md:grid md:grid-cols-4 md:gap-2 shrink-0">
                   <button onClick={() => setShowMapModal(true)} className="bg-stone-900 border border-stone-700 hover:border-amber-500 hover:text-amber-500 text-stone-400 rounded flex items-center justify-center gap-2 transition-colors py-2 md:py-0 button">
                     <span className="text-lg">🗺️</span> <span className="hidden lg:inline text-xs uppercase font-bold">Map</span> <span className="lg:hidden text-xs uppercase font-bold">Map</span>
@@ -885,9 +933,11 @@ export default function App() {
                   </button>
                   <button onClick={() => setShowSkillsModal(true)} className="bg-stone-900 border border-stone-700 hover:border-amber-500 hover:text-amber-500 text-stone-400 rounded flex items-center justify-center gap-2 transition-colors relative py-2 md:py-0 button">
                     <span className="text-lg">📜</span> <span className="hidden lg:inline text-xs uppercase font-bold">Skills</span> <span className="lg:hidden text-xs uppercase font-bold">Skills</span>
-                    {/* Badge for equip slots if not full */}
-                    {equippedSkillIds.length < 6 && passiveSkills.length > equippedSkillIds.length && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                    {/* Badge for skill points */}
+                    {skillPoints > 0 && (
+                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 text-black text-[9px] font-bold rounded-full animate-bounce flex items-center justify-center">
+                            {skillPoints}
+                        </div>
                     )}
                   </button>
                    <button onClick={() => setShowSystemModal(true)} className="bg-stone-900 border border-stone-700 hover:border-red-500 hover:text-red-500 text-stone-400 rounded flex items-center justify-center gap-2 transition-colors py-2 md:py-0 button">
@@ -897,7 +947,7 @@ export default function App() {
           </div>
       </div>
 
-      {/* RIGHT PANEL: Inventory/Shop (Responsive Cols) */}
+      {/* RIGHT PANEL: Inventory/Shop */}
       <div 
         className={`col-span-12 md:col-span-3 bg-[#080808] border-l border-[#292524] flex-col z-10 relative shadow-xl ${activeTab === 'merchant' ? 'flex flex-1 min-h-0' : 'hidden md:flex'}`} 
         onDragOver={handleDragOver} 
@@ -914,7 +964,7 @@ export default function App() {
 
            {/* Grid Container */}
            <div className="flex-grow p-4 overflow-y-auto custom-scrollbar bg-black/20">
-               {/* Standard Inventory Grid - Responsive Columns */}
+               {/* Standard Inventory Grid */}
                <div className="grid grid-cols-5 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-2 lg:gap-3 justify-items-center content-start">
                   {inventory.map((item, idx) => (
                       <InventorySlot 

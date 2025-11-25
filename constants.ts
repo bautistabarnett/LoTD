@@ -82,41 +82,202 @@ export const SLOT_ICONS: Record<ItemSlot, string> = {
 
 export const MAX_INVENTORY_SIZE = 40;
 
+// Full Branching Skill Trees
+// Positioning: Center=2, Left=1, FarLeft=0, Right=3, FarRight=4
 export const PASSIVE_SKILLS_POOL: Omit<PassiveSkill, 'level' | 'value'>[] = [
-  // --- PYROMANCY (Fire / Str / Damage) ---
-  { id: 'magma_veins', name: 'Magma Veins', rarity: Rarity.COMMON, description: 'Your blood boils, increasing Strength by {value}.', theme: PassiveTheme.PYROMANCY, statType: StatType.STRENGTH, baseValue: 5, valuePerLevel: 3 },
-  { id: 'burning_rage', name: 'Burning Rage', rarity: Rarity.COMMON, description: 'Your attacks sear enemies, adding {value} base Damage.', theme: PassiveTheme.PYROMANCY, statType: StatType.DAMAGE, baseValue: 3, valuePerLevel: 2 },
-  { id: 'cinderheart', name: 'Cinderheart', rarity: Rarity.COMMON, description: 'Vitality fuels the fire. increases Vitality by {value}.', theme: PassiveTheme.PYROMANCY, statType: StatType.VITALITY, baseValue: 5, valuePerLevel: 3 },
-  { id: 'inferno_touch', name: 'Inferno Touch', rarity: Rarity.MAGIC, description: 'Hot to the touch. Increases Magic Find by {value}%.', theme: PassiveTheme.PYROMANCY, statType: StatType.MAGIC_FIND, baseValue: 2, valuePerLevel: 2 },
-  // ENVIRONMENTAL: Forest Fire
-  { id: 'forest_fire', name: 'Wildfire', rarity: Rarity.RARE, description: 'In FORESTS, your burn effects spread instantly. +{value} Dmg in Forests.', theme: PassiveTheme.PYROMANCY, statType: StatType.DAMAGE, baseValue: 10, valuePerLevel: 5 },
-  // COMPLEX: Phoenix Protocol
+  
+  // ==========================================================================================
+  // OFFENSE TREES
+  // ==========================================================================================
+
+  // --- PYROMANCY (Fire / Str / DoT) ---
+  { 
+      id: 'magma_veins', name: 'Magma Veins', rarity: Rarity.COMMON, 
+      description: 'Your blood boils, increasing Strength by {value}.', theme: PassiveTheme.PYROMANCY, 
+      statType: StatType.STRENGTH, baseValue: 5, valuePerLevel: 3, 
+      tier: 1, maxRank: 10, treeX: 2
+  },
+  // Left Branch (Raw Damage)
+  { 
+      id: 'burning_rage', name: 'Burning Rage', rarity: Rarity.COMMON, 
+      description: 'Seething heat adds {value} base Damage.', theme: PassiveTheme.PYROMANCY, 
+      statType: StatType.DAMAGE, baseValue: 3, valuePerLevel: 2, 
+      tier: 2, maxRank: 10, prerequisiteId: 'magma_veins', treeX: 1
+  },
+  { 
+      id: 'inferno_touch', name: 'Inferno Touch', rarity: Rarity.MAGIC, 
+      description: 'Chance to find better loot in the ashes. +{value}% Magic Find.', theme: PassiveTheme.PYROMANCY, 
+      statType: StatType.MAGIC_FIND, baseValue: 5, valuePerLevel: 3,
+      tier: 3, maxRank: 5, prerequisiteId: 'burning_rage', treeX: 1
+  },
+  // Right Branch (Sustainability/AoE)
+  { 
+      id: 'cinderheart', name: 'Cinderheart', rarity: Rarity.COMMON, 
+      description: 'Fire fuels your life. +{value} Vitality.', theme: PassiveTheme.PYROMANCY, 
+      statType: StatType.VITALITY, baseValue: 5, valuePerLevel: 3,
+      tier: 2, maxRank: 10, prerequisiteId: 'magma_veins', treeX: 3
+  },
+  { 
+      id: 'forest_fire', name: 'Wildfire', rarity: Rarity.RARE, 
+      description: 'Massive damage bonus ({value}) in FOREST terrain.', theme: PassiveTheme.PYROMANCY, 
+      statType: StatType.DAMAGE, baseValue: 10, valuePerLevel: 5,
+      tier: 3, maxRank: 3, prerequisiteId: 'cinderheart', treeX: 3
+  },
+  // Ultimate
   { 
     id: 'phoenix_protocol', name: 'Phoenix Protocol', rarity: Rarity.UNIQUE,
     description: 'When hit below 30% HP, gain massive Regeneration (Cooldown: 10 turns).', 
     theme: PassiveTheme.PYROMANCY, baseValue: 0, valuePerLevel: 0,
+    tier: 4, maxRank: 1, prerequisiteId: 'forest_fire', treeX: 2,
     proc: {
         trigger: 'onTakeDamage',
         chance: 1.0,
         cooldown: 10,
         conditions: [{ type: 'hp_below', value: 0.3 }],
-        effect: { type: 'buff', subType: 'regen', value: 0.20, duration: 3 }, // 20% HP regen per turn
+        effect: { type: 'buff', subType: 'regen', value: 0.20, duration: 3 },
         description: 'Emerg. Regen'
     }
   },
 
-  // --- CRYOMANCY (Ice / Int / Defense) ---
-  { id: 'glacial_ward', name: 'Glacial Ward', rarity: Rarity.COMMON, description: 'Layers of ice protect you, increasing Armor by {value}.', theme: PassiveTheme.CRYOMANCY, statType: StatType.ARMOR, baseValue: 15, valuePerLevel: 8 },
-  { id: 'crystalline_mind', name: 'Crystalline Mind', rarity: Rarity.COMMON, description: 'Sharp focus improves Intelligence by {value}.', theme: PassiveTheme.CRYOMANCY, statType: StatType.INTELLIGENCE, baseValue: 5, valuePerLevel: 3 },
-  { id: 'frost_walker', name: 'Frost Walker', rarity: Rarity.MAGIC, description: 'Enemies slip and miss. Increases Dodge Chance by {value}%.', theme: PassiveTheme.CRYOMANCY, statType: StatType.DEXTERITY, baseValue: 5, valuePerLevel: 4 },
-  { id: 'shatter_point', name: 'Shatter Point', rarity: Rarity.MAGIC, description: 'Exploit frozen cracks. Increases Crit Chance by {value}%.', theme: PassiveTheme.CRYOMANCY, statType: StatType.CRIT_CHANCE, baseValue: 2, valuePerLevel: 1 },
-  // ENVIRONMENTAL: Tidal
-  { id: 'tidal_affinity', name: 'Tidal Ward', rarity: Rarity.RARE, description: 'In SWAMPS or near WATER, gain +{value} Vitality and regenerate health.', theme: PassiveTheme.CRYOMANCY, statType: StatType.VITALITY, baseValue: 10, valuePerLevel: 5 },
-  // COMPLEX: Static Discharge
+  // --- WARFARE (Physical / Combat) ---
+  { 
+      id: 'battle_fury', name: 'Battle Fury', rarity: Rarity.COMMON, 
+      description: 'Combat fuels you. +{value} Strength.', theme: PassiveTheme.WARFARE, 
+      statType: StatType.STRENGTH, baseValue: 8, valuePerLevel: 3,
+      tier: 1, maxRank: 10, treeX: 2
+  },
+  // Left Branch (Brutality)
+  { 
+      id: 'brutal_swing', name: 'Brutal Swing', rarity: Rarity.COMMON, 
+      description: 'Heavy swings deal +{value} Damage.', theme: PassiveTheme.WARFARE, 
+      statType: StatType.DAMAGE, baseValue: 4, valuePerLevel: 2,
+      tier: 2, maxRank: 10, prerequisiteId: 'battle_fury', treeX: 1
+  },
+  { 
+    id: 'echo_strike', name: 'Echo Strike', rarity: Rarity.RARE,
+    description: 'Critical Hits trigger a second strike for 50% damage.', 
+    theme: PassiveTheme.WARFARE, baseValue: 0, valuePerLevel: 0,
+    tier: 3, maxRank: 1, prerequisiteId: 'brutal_swing', treeX: 1,
+    proc: {
+        trigger: 'onCrit',
+        chance: 1.0,
+        cooldown: 0,
+        effect: { type: 'multi_hit', value: 0.5 },
+        description: 'Double Hit'
+    }
+  },
+  // Right Branch (Precision)
+  { 
+      id: 'war_precision', name: 'Precision', rarity: Rarity.COMMON, 
+      description: 'Find the weak spot. +{value}% Crit Chance.', theme: PassiveTheme.WARFARE, 
+      statType: StatType.CRIT_CHANCE, baseValue: 3, valuePerLevel: 1,
+      tier: 2, maxRank: 10, prerequisiteId: 'battle_fury', treeX: 3
+  },
+  { 
+      id: 'killing_spree', name: 'Killing Spree', rarity: Rarity.RARE, 
+      description: 'Momentum builds. +{value}% Attack Speed.', theme: PassiveTheme.WARFARE, 
+      statType: StatType.ATTACK_SPEED, baseValue: 5, valuePerLevel: 2,
+      tier: 3, maxRank: 5, prerequisiteId: 'war_precision', treeX: 3
+  },
+  // Ultimate
+  {
+      id: 'apex_predator', name: 'Apex Predator', rarity: Rarity.UNIQUE,
+      description: 'Killing an enemy instantly restores 30% Max HP.',
+      theme: PassiveTheme.WARFARE, baseValue: 0, valuePerLevel: 0,
+      tier: 4, maxRank: 1, prerequisiteId: 'echo_strike', treeX: 2,
+      proc: {
+          trigger: 'onKill',
+          chance: 1.0,
+          cooldown: 0,
+          effect: { type: 'heal', value: 0.3 },
+          description: 'Heal on Kill'
+      }
+  },
+
+  // ==========================================================================================
+  // DEFENSE TREES
+  // ==========================================================================================
+
+  // --- SENTINEL (Tank / Thorns) ---
+  { 
+      id: 'unyielding', name: 'Unyielding', rarity: Rarity.COMMON, 
+      description: 'Refuse to fall. Increases Vitality by {value}.', theme: PassiveTheme.SENTINEL, 
+      statType: StatType.VITALITY, baseValue: 8, valuePerLevel: 4,
+      tier: 1, maxRank: 10, treeX: 2
+  },
+  // Left Branch (Armor)
+  { 
+      id: 'iron_skin', name: 'Iron Skin', rarity: Rarity.COMMON, 
+      description: 'Hardens flesh to steel. Increases Armor by {value}.', theme: PassiveTheme.SENTINEL, 
+      statType: StatType.ARMOR, baseValue: 20, valuePerLevel: 10,
+      tier: 2, maxRank: 10, prerequisiteId: 'unyielding', treeX: 1
+  },
+  { 
+      id: 'thorns_aura', name: 'Spiked Soul', rarity: Rarity.MAGIC, 
+      description: 'Your armor hurts to touch. +{value} Thorns damage.', theme: PassiveTheme.SENTINEL, 
+      statType: StatType.THORNS, baseValue: 5, valuePerLevel: 5,
+      tier: 3, maxRank: 10, prerequisiteId: 'iron_skin', treeX: 1
+  },
+  // Right Branch (Avoidance)
+  { 
+      id: 'deflection', name: 'Deflection', rarity: Rarity.COMMON, 
+      description: 'Turn the blade aside. +{value}% Dodge Chance.', theme: PassiveTheme.SENTINEL, 
+      statType: StatType.DODGE_CHANCE, baseValue: 3, valuePerLevel: 1.5,
+      tier: 2, maxRank: 10, prerequisiteId: 'unyielding', treeX: 3
+  },
+  { 
+      id: 'shield_bash', name: 'Shield Bash', rarity: Rarity.RARE, 
+      description: 'Blocking opens opportunities. +{value} Damage.', theme: PassiveTheme.SENTINEL, 
+      statType: StatType.DAMAGE, baseValue: 5, valuePerLevel: 5,
+      tier: 3, maxRank: 5, prerequisiteId: 'deflection', treeX: 3
+  },
+  // Ultimate
+  {
+      id: 'titans_gaze', name: 'Titan\'s Gaze', rarity: Rarity.UNIQUE,
+      description: 'Your attacks have a 20% chance to STUN the enemy.',
+      theme: PassiveTheme.SENTINEL, baseValue: 0, valuePerLevel: 0,
+      tier: 4, maxRank: 1, prerequisiteId: 'thorns_aura', treeX: 2,
+      proc: {
+          trigger: 'onHit',
+          chance: 0.2,
+          cooldown: 0,
+          effect: { type: 'debuff', subType: 'stun', value: 1, duration: 1 },
+          description: 'Stun Chance'
+      }
+  },
+
+  // --- CRYOMANCY (Ice / Armor / Int) ---
+  { 
+      id: 'glacial_ward', name: 'Glacial Ward', rarity: Rarity.COMMON, 
+      description: 'Layers of ice protect you. +{value} Armor.', theme: PassiveTheme.CRYOMANCY, 
+      statType: StatType.ARMOR, baseValue: 15, valuePerLevel: 8,
+      tier: 1, maxRank: 10, treeX: 2
+  },
+  { 
+      id: 'crystalline_mind', name: 'Crystalline Mind', rarity: Rarity.COMMON, 
+      description: 'Sharp focus improves Intelligence by {value}.', theme: PassiveTheme.CRYOMANCY, 
+      statType: StatType.INTELLIGENCE, baseValue: 5, valuePerLevel: 3,
+      tier: 2, maxRank: 10, prerequisiteId: 'glacial_ward', treeX: 2
+  },
+  // Split at Tier 3
+  { 
+      id: 'frost_walker', name: 'Frost Walker', rarity: Rarity.MAGIC, 
+      description: 'Enemies slip and miss. Increases Dodge Chance by {value}%.', theme: PassiveTheme.CRYOMANCY, 
+      statType: StatType.DODGE_CHANCE, baseValue: 5, valuePerLevel: 4,
+      tier: 3, maxRank: 5, prerequisiteId: 'crystalline_mind', treeX: 1
+  },
+  { 
+      id: 'shatter_point', name: 'Shatter Point', rarity: Rarity.MAGIC, 
+      description: 'Exploit frozen cracks. Increases Crit Chance by {value}%.', theme: PassiveTheme.CRYOMANCY, 
+      statType: StatType.CRIT_CHANCE, baseValue: 2, valuePerLevel: 1,
+      tier: 3, maxRank: 5, prerequisiteId: 'crystalline_mind', treeX: 3
+  },
+  // Ultimate
   { 
     id: 'static_discharge', name: 'Static Field', rarity: Rarity.UNIQUE,
     description: 'Every 3rd turn, discharge energy to Stun the enemy.', 
     theme: PassiveTheme.CRYOMANCY, baseValue: 0, valuePerLevel: 0,
+    tier: 4, maxRank: 1, prerequisiteId: 'shatter_point', treeX: 2,
     proc: {
         trigger: 'onStartTurn',
         chance: 1.0,
@@ -127,31 +288,283 @@ export const PASSIVE_SKILLS_POOL: Omit<PassiveSkill, 'level' | 'value'>[] = [
     }
   },
 
+  // ==========================================================================================
+  // CONTROL TREES
+  // ==========================================================================================
+
   // --- SHADOW (Poison / Crit / Life Steal) ---
-  { id: 'venom_coating', name: 'Venom Coating', rarity: Rarity.COMMON, description: 'Exposes weak points. Increases Crit Chance by {value}%.', theme: PassiveTheme.SHADOW, statType: StatType.CRIT_CHANCE, baseValue: 3, valuePerLevel: 1.5 },
-  { id: 'void_hunger', name: 'Void Hunger', rarity: Rarity.MAGIC, description: 'Drains life from foes. Increases Life Steal by {value}%.', theme: PassiveTheme.SHADOW, statType: StatType.LIFE_STEAL, baseValue: 2, valuePerLevel: 1 },
-  { id: 'shadow_step', name: 'Shadow Step', rarity: Rarity.COMMON, description: 'Move unseen. Increases Dexterity by {value}.', theme: PassiveTheme.SHADOW, statType: StatType.DEXTERITY, baseValue: 5, valuePerLevel: 3 },
-  // ENVIRONMENTAL: Graveborn
-  { id: 'grave_born', name: 'Graveborn', rarity: Rarity.RARE, description: 'In CRYPTS or RUINS, gain +{value}% Life Steal.', theme: PassiveTheme.SHADOW, statType: StatType.LIFE_STEAL, baseValue: 5, valuePerLevel: 2 },
-  // COMPLEX: Blood Rite
+  { 
+      id: 'shadow_step', name: 'Shadow Step', rarity: Rarity.COMMON, 
+      description: 'Move unseen. Increases Dexterity by {value}.', theme: PassiveTheme.SHADOW, 
+      statType: StatType.DEXTERITY, baseValue: 5, valuePerLevel: 3,
+      tier: 1, maxRank: 10, treeX: 2
+  },
+  // Left Branch (Poison)
+  { 
+      id: 'venom_coating', name: 'Venom Coating', rarity: Rarity.COMMON, 
+      description: 'Coats weapons in toxin. +{value}% Crit Chance.', theme: PassiveTheme.SHADOW, 
+      statType: StatType.CRIT_CHANCE, baseValue: 3, valuePerLevel: 1.5,
+      tier: 2, maxRank: 10, prerequisiteId: 'shadow_step', treeX: 1
+  },
+  { 
+      id: 'toxic_cloud', name: 'Toxic Cloud', rarity: Rarity.MAGIC, 
+      description: 'Poison chokes the air. +{value} Vitality.', theme: PassiveTheme.SHADOW, 
+      statType: StatType.VITALITY, baseValue: 5, valuePerLevel: 3,
+      tier: 3, maxRank: 5, prerequisiteId: 'venom_coating', treeX: 1
+  },
+  // Right Branch (Life Steal / Dmg)
+  { 
+      id: 'assassins_eye', name: 'Assassin\'s Eye', rarity: Rarity.COMMON, 
+      description: 'Knowing where to strike. +{value} Damage.', theme: PassiveTheme.SHADOW, 
+      statType: StatType.DAMAGE, baseValue: 3, valuePerLevel: 2,
+      tier: 2, maxRank: 10, prerequisiteId: 'shadow_step', treeX: 3
+  },
+  { 
+      id: 'void_hunger', name: 'Void Hunger', rarity: Rarity.MAGIC, 
+      description: 'Drains life from foes. Increases Life Steal by {value}%.', theme: PassiveTheme.SHADOW, 
+      statType: StatType.LIFE_STEAL, baseValue: 2, valuePerLevel: 1,
+      tier: 3, maxRank: 5, prerequisiteId: 'assassins_eye', treeX: 3
+  },
+  // Ultimate
   { 
     id: 'blood_rite', name: 'Blood Rite', rarity: Rarity.UNIQUE,
     description: 'Sacrifice 5% HP at start of turn to gain Scaling Strength (Stacking).', 
     theme: PassiveTheme.SHADOW, baseValue: 0, valuePerLevel: 0,
+    tier: 4, maxRank: 1, prerequisiteId: 'void_hunger', treeX: 2,
     proc: {
         trigger: 'onStartTurn',
         chance: 1.0,
         cooldown: 0,
         cost: { type: 'hp_percent', value: 0.05 },
-        effect: { type: 'buff', subType: 'scaling_strength', value: 5, duration: 99, isStackable: true }, // +5 Str per turn
+        effect: { type: 'buff', subType: 'scaling_strength', value: 5, duration: 99, isStackable: true }, 
         description: 'HP -> Str'
     }
   },
-  // UNIQUE: Void Form (Exploration Reward)
+
+  // --- ARCANE (Magic / Shields) ---
+  { 
+      id: 'ley_lines', name: 'Ley Lines', rarity: Rarity.COMMON, 
+      description: 'Tap into magic. +{value} Intelligence.', theme: PassiveTheme.ARCANE, 
+      statType: StatType.INTELLIGENCE, baseValue: 8, valuePerLevel: 3,
+      tier: 1, maxRank: 10, treeX: 2
+  },
+  // Left: Defensive Magic
+  { 
+      id: 'arcane_armor', name: 'Mage Armor', rarity: Rarity.COMMON, 
+      description: 'Magic solidifies. +{value} Armor.', theme: PassiveTheme.ARCANE, 
+      statType: StatType.ARMOR, baseValue: 10, valuePerLevel: 8,
+      tier: 2, maxRank: 10, prerequisiteId: 'ley_lines', treeX: 1
+  },
+  { 
+    id: 'mana_shield', name: 'Mana Shield', rarity: Rarity.RARE,
+    description: 'When hit, reduce damage by 50% but lose Gold (as Mana substitute).', 
+    theme: PassiveTheme.ARCANE, baseValue: 0, valuePerLevel: 0,
+    tier: 3, maxRank: 1, prerequisiteId: 'arcane_armor', treeX: 1,
+    proc: {
+        trigger: 'onTakeDamage', 
+        chance: 0.5,
+        cooldown: 2,
+        effect: { type: 'shield', value: 1, duration: 1 },
+        description: 'Dmg Mitigation'
+    }
+  },
+  // Right: Offensive Magic
+  { 
+      id: 'mystic_focus', name: 'Mystic Focus', rarity: Rarity.COMMON, 
+      description: 'Channeling power. +{value}% Crit Chance.', theme: PassiveTheme.ARCANE, 
+      statType: StatType.CRIT_CHANCE, baseValue: 2, valuePerLevel: 1,
+      tier: 2, maxRank: 10, prerequisiteId: 'ley_lines', treeX: 3
+  },
+  { 
+      id: 'arcane_power', name: 'Overload', rarity: Rarity.RARE,
+      description: 'Pure magic flow. +{value} Damage.', 
+      theme: PassiveTheme.ARCANE, statType: StatType.DAMAGE, baseValue: 10, valuePerLevel: 5,
+      tier: 3, maxRank: 5, prerequisiteId: 'mystic_focus', treeX: 3,
+  },
+  // Ultimate
   {
+      id: 'time_dilation', name: 'Time Dilation', rarity: Rarity.UNIQUE,
+      description: 'Gain a massive burst of Agility (Dexterity) at the start of battle.',
+      theme: PassiveTheme.ARCANE, baseValue: 0, valuePerLevel: 0,
+      tier: 4, maxRank: 1, prerequisiteId: 'arcane_power', treeX: 2,
+      proc: {
+          trigger: 'onBattleStart',
+          chance: 1.0,
+          cooldown: 0,
+          effect: { type: 'buff', subType: 'dodge_boost', value: 100, duration: 2 }, // Using dodge boost as proxy for agility/speed
+          description: 'Time Slow'
+      }
+  },
+
+  // ==========================================================================================
+  // UTILITY & EXPLORATION
+  // ==========================================================================================
+
+  // --- FORTUNE (Loot / Gold) ---
+  { 
+      id: 'gold_lust', name: 'Gold Lust', rarity: Rarity.COMMON, 
+      description: 'Greed fuels you. Increases Attack Speed by {value}%.', theme: PassiveTheme.FORTUNE, 
+      statType: StatType.ATTACK_SPEED, baseValue: 5, valuePerLevel: 2,
+      tier: 1, maxRank: 5, treeX: 2
+  },
+  // Left: Loot
+  { 
+      id: 'midas_touch', name: 'Midas Touch', rarity: Rarity.MAGIC, 
+      description: 'Fortune favors the bold. Increases Magic Find by {value}%.', theme: PassiveTheme.FORTUNE, 
+      statType: StatType.MAGIC_FIND, baseValue: 15, valuePerLevel: 5,
+      tier: 2, maxRank: 5, prerequisiteId: 'gold_lust', treeX: 1
+  },
+  { 
+      id: 'lucky_charm', name: 'Lucky Charm', rarity: Rarity.RARE, 
+      description: 'Serendipity saves lives. Increases Dodge Chance by {value}%.', theme: PassiveTheme.FORTUNE, 
+      statType: StatType.DEXTERITY, baseValue: 3, valuePerLevel: 2,
+      tier: 3, maxRank: 5, prerequisiteId: 'midas_touch', treeX: 1
+  },
+  // Right: Survival
+  { 
+      id: 'gamblers_dodge', name: 'Gambler\'s Dodge', rarity: Rarity.MAGIC, 
+      description: 'High stakes reflexes. +{value}% Dodge Chance.', theme: PassiveTheme.FORTUNE, 
+      statType: StatType.DODGE_CHANCE, baseValue: 5, valuePerLevel: 3,
+      tier: 2, maxRank: 5, prerequisiteId: 'gold_lust', treeX: 3
+  },
+  { 
+      id: 'bribe_fate', name: 'Bribe Fate', rarity: Rarity.RARE, 
+      description: 'When hit, 20% chance to stun the attacker.', theme: PassiveTheme.FORTUNE, 
+      baseValue: 0, valuePerLevel: 0,
+      tier: 3, maxRank: 1, prerequisiteId: 'gamblers_dodge', treeX: 3,
+      proc: {
+          trigger: 'onTakeDamage',
+          chance: 0.2,
+          cooldown: 0,
+          effect: { type: 'debuff', subType: 'stun', value: 1, duration: 1 },
+          description: 'Bribe Stun'
+      }
+  },
+  // Ultimate
+  {
+      id: 'tycoon', name: 'Tycoon', rarity: Rarity.UNIQUE,
+      description: 'Massive Magic Find boost +100%.',
+      theme: PassiveTheme.FORTUNE, statType: StatType.MAGIC_FIND, baseValue: 100, valuePerLevel: 0,
+      tier: 4, maxRank: 1, prerequisiteId: 'lucky_charm', treeX: 2
+  },
+
+  // --- SCOUTING (Exploration) ---
+  { 
+      id: 'pathfinder', name: 'Pathfinder', rarity: Rarity.COMMON, 
+      description: 'Knowledge of the land increases Dexterity by {value}.', theme: PassiveTheme.SCOUTING, 
+      statType: StatType.DEXTERITY, baseValue: 8, valuePerLevel: 3,
+      tier: 1, maxRank: 10, treeX: 2
+  },
+  // Left: Combat Advantage
+  { 
+      id: 'night_prowler', name: 'Nightstalker', rarity: Rarity.RARE, 
+      description: 'At NIGHT, gain +{value}% Crit Chance and First Strike.', theme: PassiveTheme.SCOUTING, 
+      statType: StatType.CRIT_CHANCE, baseValue: 15, valuePerLevel: 5,
+      tier: 2, maxRank: 5, prerequisiteId: 'pathfinder', treeX: 1
+  },
+  { 
+    id: 'ambush_tactics', name: 'Ambush', rarity: Rarity.RARE,
+    description: 'Deal massive damage on Turn 1, then effect fades.', 
+    theme: PassiveTheme.SCOUTING, baseValue: 0, valuePerLevel: 0,
+    tier: 3, maxRank: 1, prerequisiteId: 'night_prowler', treeX: 1,
+    proc: {
+        trigger: 'onStartTurn',
+        chance: 1.0,
+        cooldown: 99, 
+        conditions: [{ type: 'turn_count_multiple', value: 1 }], 
+        effect: { type: 'damage_phys', value: 2.0 },
+        description: 'First Strike'
+    }
+  },
+  // Right: Explorer
+  { 
+      id: 'trailblazer', name: 'Trailblazer', rarity: Rarity.MAGIC, 
+      description: 'Move swiftly through terrain. +{value} Vitality.', theme: PassiveTheme.SCOUTING, 
+      statType: StatType.VITALITY, baseValue: 10, valuePerLevel: 5,
+      tier: 2, maxRank: 5, prerequisiteId: 'pathfinder', treeX: 3
+  },
+  { 
+      id: 'cartography', name: 'Cartography', rarity: Rarity.RARE, 
+      description: 'Find hidden stashes. +{value}% Magic Find.', theme: PassiveTheme.SCOUTING, 
+      statType: StatType.MAGIC_FIND, baseValue: 20, valuePerLevel: 5,
+      tier: 3, maxRank: 5, prerequisiteId: 'trailblazer', treeX: 3
+  },
+  // Ultimate
+  {
+      id: 'omniscience', name: 'Omniscience', rarity: Rarity.UNIQUE,
+      description: 'Start every battle with 100% Dodge for 1 turn.',
+      theme: PassiveTheme.SCOUTING, baseValue: 0, valuePerLevel: 0,
+      tier: 4, maxRank: 1, prerequisiteId: 'ambush_tactics', treeX: 2,
+      proc: {
+          trigger: 'onBattleStart',
+          chance: 1.0,
+          cooldown: 0,
+          effect: { type: 'buff', subType: 'dodge_boost', value: 100, duration: 1 },
+          description: 'Predict Move'
+      }
+  },
+
+  // --- NATURE (Terrain / Regen) ---
+  { 
+      id: 'oak_skin', name: 'Oak Skin', rarity: Rarity.COMMON, 
+      description: 'Tough as bark. +{value} Vitality.', theme: PassiveTheme.NATURE, 
+      statType: StatType.VITALITY, baseValue: 8, valuePerLevel: 3,
+      tier: 1, maxRank: 10, treeX: 2
+  },
+  // Left: Adaptation
+  { 
+      id: 'swamp_thing', name: 'Mire Soul', rarity: Rarity.RARE, 
+      description: 'In SWAMPS, poison enemies on contact. +{value} Armor.', theme: PassiveTheme.NATURE, 
+      statType: StatType.ARMOR, baseValue: 15, valuePerLevel: 5,
+      tier: 2, maxRank: 5, prerequisiteId: 'oak_skin', treeX: 1
+  },
+  { 
+      id: 'entangle', name: 'Entangle', rarity: Rarity.RARE, 
+      description: 'Attacks have 30% chance to Slow (Chill) enemy.', theme: PassiveTheme.NATURE, 
+      baseValue: 0, valuePerLevel: 0,
+      tier: 3, maxRank: 1, prerequisiteId: 'swamp_thing', treeX: 1,
+      proc: {
+          trigger: 'onHit',
+          chance: 0.3,
+          cooldown: 0,
+          effect: { type: 'debuff', subType: 'chill', value: 0.2, duration: 2 },
+          description: 'Slow'
+      }
+  },
+  // Right: Recovery
+  { 
+      id: 'herbalism', name: 'Herbalism', rarity: Rarity.COMMON, 
+      description: 'Knowledge of roots. +{value} Life Steal %.', theme: PassiveTheme.NATURE, 
+      statType: StatType.LIFE_STEAL, baseValue: 2, valuePerLevel: 1,
+      tier: 2, maxRank: 10, prerequisiteId: 'oak_skin', treeX: 3
+  },
+  {
+      id: 'photosynthesis', name: 'Photosynthesis', rarity: Rarity.RARE,
+      description: 'Regenerate {value}% HP every turn.', theme: PassiveTheme.NATURE,
+      statType: StatType.VITALITY, baseValue: 0, valuePerLevel: 0, // Effect handled via proc logic usually, but here simulating via constant proc
+      tier: 3, maxRank: 1, prerequisiteId: 'herbalism', treeX: 3,
+      proc: {
+          trigger: 'onStartTurn',
+          chance: 1.0,
+          cooldown: 0,
+          effect: { type: 'heal', value: 0.05 },
+          description: 'Regen 5%'
+      }
+  },
+  // Ultimate
+  {
+      id: 'force_of_nature', name: 'Force of Nature', rarity: Rarity.UNIQUE,
+      description: 'Massive Vitality and Thorns boost.',
+      theme: PassiveTheme.NATURE, statType: StatType.THORNS, baseValue: 50, valuePerLevel: 0,
+      tier: 4, maxRank: 1, prerequisiteId: 'photosynthesis', treeX: 2
+  },
+  
+  // -- ISOLATED / LOOT ONLY SKILLS (Tier 0 or no Tier) --
+  { 
       id: 'void_form', name: 'Void Form', rarity: Rarity.UNIQUE,
       description: 'Shift into the void at the start of battle, gaining massive Dodge chance for 2 turns.',
       theme: PassiveTheme.SHADOW, baseValue: 0, valuePerLevel: 0,
+      tier: 4, maxRank: 1, treeX: 2,
       proc: {
           trigger: 'onBattleStart',
           chance: 1.0,
@@ -160,16 +573,11 @@ export const PASSIVE_SKILLS_POOL: Omit<PassiveSkill, 'level' | 'value'>[] = [
           description: 'Ethereal'
       }
   },
-
-  // --- SENTINEL (Defense / Tank) ---
-  { id: 'iron_skin', name: 'Iron Skin', rarity: Rarity.COMMON, description: 'Hardens flesh to steel. Increases Armor by {value}.', theme: PassiveTheme.SENTINEL, statType: StatType.ARMOR, baseValue: 20, valuePerLevel: 10 },
-  { id: 'unyielding', name: 'Unyielding', rarity: Rarity.COMMON, description: 'Refuse to fall. Increases Vitality by {value}.', theme: PassiveTheme.SENTINEL, statType: StatType.VITALITY, baseValue: 8, valuePerLevel: 4 },
-  { id: 'thorns_aura', name: 'Spiked Soul', rarity: Rarity.MAGIC, description: 'Your presence hurts. Increases Strength by {value}.', theme: PassiveTheme.SENTINEL, statType: StatType.STRENGTH, baseValue: 5, valuePerLevel: 3 },
-  // RARE: Purifying Light (Cleanse Test)
   {
       id: 'purifying_light', name: 'Purifying Light', rarity: Rarity.RARE,
       description: 'Taking damage has a 20% chance to Cleanse all negative effects.',
       theme: PassiveTheme.SENTINEL, baseValue: 0, valuePerLevel: 0,
+      tier: 3, maxRank: 1, treeX: 3,
       proc: {
           trigger: 'onTakeDamage',
           chance: 0.2,
@@ -178,91 +586,8 @@ export const PASSIVE_SKILLS_POOL: Omit<PassiveSkill, 'level' | 'value'>[] = [
           description: 'Cleanse'
       }
   },
-  // UNIQUE: Titan's Gaze
-  {
-      id: 'titans_gaze', name: 'Titan\'s Gaze', rarity: Rarity.UNIQUE,
-      description: 'Your attacks have a 20% chance to STUN the enemy.',
-      theme: PassiveTheme.SENTINEL, baseValue: 0, valuePerLevel: 0,
-      proc: {
-          trigger: 'onHit',
-          chance: 0.2,
-          cooldown: 0,
-          effect: { type: 'debuff', subType: 'stun', value: 1, duration: 1 },
-          description: 'Stun Chance'
-      }
-  },
-
-  // --- FORTUNE (Loot) ---
-  { id: 'midas_touch', name: 'Midas Touch', rarity: Rarity.MAGIC, description: 'Fortune favors the bold. Increases Magic Find by {value}%.', theme: PassiveTheme.FORTUNE, statType: StatType.MAGIC_FIND, baseValue: 15, valuePerLevel: 5 },
-  { id: 'gold_lust', name: 'Gold Lust', rarity: Rarity.COMMON, description: 'Greed fuels you. Increases Attack Speed by {value}%.', theme: PassiveTheme.FORTUNE, statType: StatType.ATTACK_SPEED, baseValue: 5, valuePerLevel: 2 },
-  { id: 'lucky_charm', name: 'Lucky Charm', rarity: Rarity.RARE, description: 'Serendipity saves lives. Increases Dodge Chance by {value}%.', theme: PassiveTheme.FORTUNE, statType: StatType.DEXTERITY, baseValue: 3, valuePerLevel: 2 },
-
-  // --- SCOUTING ---
-  { id: 'night_prowler', name: 'Nightstalker', rarity: Rarity.RARE, description: 'At NIGHT, gain +{value}% Crit Chance and First Strike.', theme: PassiveTheme.SCOUTING, statType: StatType.CRIT_CHANCE, baseValue: 15, valuePerLevel: 5 },
-  { id: 'pathfinder', name: 'Pathfinder', rarity: Rarity.COMMON, description: 'Knowledge of the land increases Dexterity by {value}.', theme: PassiveTheme.SCOUTING, statType: StatType.DEXTERITY, baseValue: 8, valuePerLevel: 3 },
-  // COMPLEX: Ambush
-  { 
-    id: 'ambush_tactics', name: 'Ambush', rarity: Rarity.RARE,
-    description: 'Deal massive damage on Turn 1, then effect fades.', 
-    theme: PassiveTheme.SCOUTING, baseValue: 0, valuePerLevel: 0,
-    proc: {
-        trigger: 'onStartTurn',
-        chance: 1.0,
-        cooldown: 99, // Once per battle
-        conditions: [{ type: 'turn_count_multiple', value: 1 }], // Acts as "First Turn" logic if combined with cooldown
-        effect: { type: 'damage_phys', value: 2.0 }, // 200% DMG
-        description: 'First Strike'
-    }
-  },
-
-  // --- WARFARE ---
-  { id: 'battle_fury', name: 'Battle Fury', rarity: Rarity.COMMON, description: 'Combat fuels you. +{value} Strength.', theme: PassiveTheme.WARFARE, statType: StatType.STRENGTH, baseValue: 10, valuePerLevel: 3 },
-  // COMPLEX: Echo Strike
-  { 
-    id: 'echo_strike', name: 'Echo Strike', rarity: Rarity.RARE,
-    description: 'Critical Hits trigger a second strike for 50% damage.', 
-    theme: PassiveTheme.WARFARE, baseValue: 0, valuePerLevel: 0,
-    proc: {
-        trigger: 'onCrit',
-        chance: 1.0,
-        cooldown: 0,
-        effect: { type: 'multi_hit', value: 0.5 },
-        description: 'Double Hit'
-    }
-  },
-  // UNIQUE: Apex Predator
-  {
-      id: 'apex_predator', name: 'Apex Predator', rarity: Rarity.UNIQUE,
-      description: 'Killing an enemy instantly restores 30% Max HP.',
-      theme: PassiveTheme.WARFARE, baseValue: 0, valuePerLevel: 0,
-      proc: {
-          trigger: 'onKill',
-          chance: 1.0,
-          cooldown: 0,
-          effect: { type: 'heal', value: 0.3 },
-          description: 'Heal on Kill'
-      }
-  },
-
-  // --- NATURE ---
-  { id: 'swamp_thing', name: 'Mire Soul', rarity: Rarity.RARE, description: 'In SWAMPS, poison enemies on contact. +{value} Armor.', theme: PassiveTheme.NATURE, statType: StatType.ARMOR, baseValue: 15, valuePerLevel: 5 },
-  { id: 'oak_skin', name: 'Oak Skin', rarity: Rarity.COMMON, description: 'Tough as bark. +{value} Vitality.', theme: PassiveTheme.NATURE, statType: StatType.VITALITY, baseValue: 8, valuePerLevel: 3 },
-
-  // --- ARCANE ---
-  { id: 'ley_lines', name: 'Ley Lines', rarity: Rarity.COMMON, description: 'Tap into magic. +{value} Intelligence.', theme: PassiveTheme.ARCANE, statType: StatType.INTELLIGENCE, baseValue: 8, valuePerLevel: 3 },
-  // COMPLEX: Mana Shield
-  { 
-    id: 'mana_shield', name: 'Mana Shield', rarity: Rarity.RARE,
-    description: 'When hit, reduce damage by 50% but lose Gold (as Mana substitute).', 
-    theme: PassiveTheme.ARCANE, baseValue: 0, valuePerLevel: 0,
-    proc: {
-        trigger: 'onTakeDamage', // handled specially in engine to reduce damage? Or reactive heal?
-        chance: 0.5,
-        cooldown: 2,
-        effect: { type: 'shield', value: 1, duration: 1 },
-        description: 'Dmg Mitigation'
-    }
-  },
+  { id: 'tidal_affinity', name: 'Tidal Ward', rarity: Rarity.RARE, description: 'In SWAMPS or near WATER, gain +{value} Vitality and regenerate health.', theme: PassiveTheme.CRYOMANCY, statType: StatType.VITALITY, baseValue: 10, valuePerLevel: 5, tier: 2, maxRank: 5, treeX: 3 },
+  { id: 'grave_born', name: 'Graveborn', rarity: Rarity.RARE, description: 'In CRYPTS or RUINS, gain +{value}% Life Steal.', theme: PassiveTheme.SHADOW, statType: StatType.LIFE_STEAL, baseValue: 5, valuePerLevel: 2, tier: 2, maxRank: 5, treeX: 2 },
 ];
 
 // Game Changing Set Bonuses

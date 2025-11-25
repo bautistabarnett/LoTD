@@ -39,7 +39,8 @@ export enum StatType {
   ATTACK_SPEED = 'Attack Speed',
   MAGIC_FIND = 'Magic Find',
   LIFE_STEAL = 'Life Steal',
-  THORNS = 'Thorns' // Enemy specific usually
+  THORNS = 'Thorns', // Enemy specific usually
+  DODGE_CHANCE = 'Dodge Chance'
 }
 
 export enum CombatStance {
@@ -120,14 +121,20 @@ export interface PassiveSkill {
   description: string;
   theme: PassiveTheme;
   level: number;
-  rarity: Rarity; // New: Skills now have rarity
-  statType?: StatType; // If it boosts a stat directly
+  rarity: Rarity; 
+  statType?: StatType; 
   value: number; // The current calculated value
   baseValue: number;
   valuePerLevel: number;
   flavorText?: string;
   
-  // New: Active Component
+  // Tree Properties
+  tier: 1 | 2 | 3 | 4; // Vertical Slice
+  maxRank: number;
+  prerequisiteId?: string; // ID of parent node
+  treeX?: number; // Visual X position (0-4)
+  
+  // Active Component
   proc?: SkillProcDefinition;
 }
 
@@ -211,6 +218,7 @@ export interface PlayerStats {
   critChance: number;
   dodgeChance: number;
   statPoints: number;
+  skillPoints: number; // New currency for tree
   activeSetBonuses: PassiveTheme[];
   activeSynergies: string[]; // IDs of active synergies
   heroImageUrl?: string; // Custom Hero Avatar
@@ -348,6 +356,7 @@ export interface SaveData {
     gold: number;
     baseAttributes: BaseAttributes;
     statPoints: number;
+    skillPoints: number;
     passiveSkills: PassiveSkill[];
     equippedSkillIds: string[]; // New: Track active skills
     buildLoadouts: BuildLoadout[]; // New: Saved builds

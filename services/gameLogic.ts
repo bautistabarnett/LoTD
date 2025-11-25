@@ -1,5 +1,3 @@
-
-
 import { Item, ItemSlot, Rarity, StatType, ItemStat, Monster, BaseAttributes, PassiveSkill, PlayerStats, EquipmentMap, ActiveEffect, PassiveTheme, MonsterRarity, MaledictAffix, SynergyDefinition } from '../types';
 import { PASSIVE_SKILLS_POOL, PASSIVE_SET_BONUSES, COMPOSITE_SYNERGIES, MALEDICT_AFFIXES } from '../constants';
 import { BALANCE } from './gameBalance';
@@ -92,6 +90,7 @@ export const generateLoot = (level: number, difficulty: number = 1, magicFind: n
   if (slot === ItemSlot.MAIN_HAND) possibleStats.push(StatType.DAMAGE, StatType.ATTACK_SPEED);
   if ([ItemSlot.OFF_HAND, ItemSlot.HEAD, ItemSlot.CHEST, ItemSlot.GLOVES, ItemSlot.BOOTS].includes(slot)) possibleStats.push(StatType.ARMOR);
   if ([ItemSlot.RING, ItemSlot.AMULET, ItemSlot.GLOVES].includes(slot)) possibleStats.push(StatType.CRIT_CHANCE);
+  if ([ItemSlot.BOOTS, ItemSlot.LEGS, ItemSlot.RING, ItemSlot.AMULET].includes(slot)) possibleStats.push(StatType.DODGE_CHANCE);
   if ([ItemSlot.RING, ItemSlot.AMULET, ItemSlot.HEAD, ItemSlot.GLOVES, ItemSlot.BOOTS].includes(slot)) possibleStats.push(StatType.MAGIC_FIND);
 
   for (let i = 0; i < numStats; i++) {
@@ -101,7 +100,7 @@ export const generateLoot = (level: number, difficulty: number = 1, magicFind: n
     if ([StatType.STRENGTH, StatType.DEXTERITY, StatType.INTELLIGENCE, StatType.VITALITY].includes(statType)) baseVal = getRandomInt(2, 5) * level;
     else if (statType === StatType.DAMAGE) baseVal = getRandomInt(2, 4) * level;
     else if (statType === StatType.ARMOR) baseVal = getRandomInt(5, 10) * level;
-    else if (statType === StatType.CRIT_CHANCE || statType === StatType.ATTACK_SPEED) baseVal = getRandomInt(1, 5);
+    else if (statType === StatType.CRIT_CHANCE || statType === StatType.ATTACK_SPEED || statType === StatType.DODGE_CHANCE) baseVal = getRandomInt(1, 5);
     else if (statType === StatType.MAGIC_FIND) baseVal = getRandomInt(5, 15); 
 
     let val = Math.floor(baseVal * statMultiplier) || 1; 
@@ -287,6 +286,7 @@ export const calculatePlayerStats = (
     level: level,
     xp: 0, xpToNextLevel: 0, gold: 0, maxHp: 100,
     statPoints: availableStatPoints,
+    skillPoints: 0,
     activeSetBonuses: [],
     activeSynergies: [],
     equippedSkillIds: equippedSkillIds
@@ -308,6 +308,7 @@ export const calculatePlayerStats = (
       case StatType.MAGIC_FIND: currentStats.magicFind += passive.value; break;
       case StatType.LIFE_STEAL: currentStats.lifeSteal += passive.value; break;
       case StatType.CRIT_CHANCE: currentStats.critChance += passive.value; break;
+      case StatType.DODGE_CHANCE: currentStats.dodgeChance += passive.value; break;
     }
   });
 
@@ -333,6 +334,7 @@ export const calculatePlayerStats = (
                 case StatType.MAGIC_FIND: currentStats.magicFind += stat.value; break;
                 case StatType.LIFE_STEAL: currentStats.lifeSteal += stat.value; break;
                 case StatType.CRIT_CHANCE: currentStats.critChance += stat.value; break;
+                case StatType.DODGE_CHANCE: currentStats.dodgeChance += stat.value; break;
              }
           });
       }
@@ -359,6 +361,7 @@ export const calculatePlayerStats = (
         case StatType.MAGIC_FIND: currentStats.magicFind += stat.value; break;
         case StatType.LIFE_STEAL: currentStats.lifeSteal += stat.value; break;
         case StatType.CRIT_CHANCE: currentStats.critChance += stat.value; break;
+        case StatType.DODGE_CHANCE: currentStats.dodgeChance += stat.value; break;
       }
     });
   });
@@ -376,6 +379,7 @@ export const calculatePlayerStats = (
       case StatType.MAGIC_FIND: currentStats.magicFind += val; break;
       case StatType.LIFE_STEAL: currentStats.lifeSteal += val; break;
       case StatType.CRIT_CHANCE: currentStats.critChance += val; break;
+      case StatType.DODGE_CHANCE: currentStats.dodgeChance += val; break;
     }
   });
 

@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Item } from '../types';
 import { RARITY_COLORS } from '../constants';
 
@@ -17,12 +18,12 @@ const ItemCard = ({ item, label, isEquipped }: { item: Item; label?: string, isE
   if (item.rarity === 'Unique') borderColor = 'border-amber-600';
 
   return (
-    <div className={`w-72 bg-[#0a0a0a]/95 border-2 ${borderColor} p-0 shadow-[0_0_30px_rgba(0,0,0,0.8)] rounded-sm text-sm relative shrink-0 overflow-hidden`}>
+    <div className={`w-72 bg-[#0a0a0a]/95 border-2 ${borderColor} p-0 shadow-[0_0_30px_rgba(0,0,0,0.8)] rounded-sm text-sm relative shrink-0 flex flex-col`}>
       {/* Background Texture */}
       <div className="absolute inset-0 bg-texture-noise opacity-10 pointer-events-none"></div>
       
       {/* Header */}
-      <div className={`p-3 bg-gradient-to-b from-stone-900 to-black border-b ${borderColor} relative`}>
+      <div className={`p-3 bg-gradient-to-b from-stone-900 to-black border-b ${borderColor} relative shrink-0`}>
           {label && (
             <div className="absolute -top-2 left-1/2 -translate-x-1/2 bg-stone-950 text-stone-400 text-[9px] px-3 py-0.5 border border-stone-700 uppercase tracking-widest whitespace-nowrap z-10 shadow-md">
               {label}
@@ -36,8 +37,8 @@ const ItemCard = ({ item, label, isEquipped }: { item: Item; label?: string, isE
           </p>
       </div>
 
-      {/* Content */}
-      <div className="p-4 space-y-3 relative">
+      {/* Content - Scrollable if too tall */}
+      <div className="p-4 space-y-3 relative overflow-y-auto custom-scrollbar" style={{ maxHeight: 'calc(100vh - 200px)' }}>
         <div className="space-y-1">
           {item.stats.map((stat, idx) => (
             <div key={idx} className="flex justify-between text-stone-300 font-serif text-[15px]">
@@ -65,8 +66,8 @@ const ItemCard = ({ item, label, isEquipped }: { item: Item; label?: string, isE
           </div>
         )}
 
-        <div className="absolute bottom-1 right-2 text-stone-700 text-[9px] font-mono">
-          iLvl {item.level}
+        <div className="pt-2 flex justify-end mt-auto">
+            <span className="text-stone-700 text-[9px] font-mono">iLvl {item.level}</span>
         </div>
       </div>
     </div>
@@ -74,43 +75,67 @@ const ItemCard = ({ item, label, isEquipped }: { item: Item; label?: string, isE
 };
 
 const Tooltip: React.FC<TooltipProps> = ({ item, comparedItem, position }) => {
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  
-  // Calculate Base Position
-  let left = position.x + 15;
-  let top = position.y + 10;
-  
-  // Strict Horizontal Clamp
-  // Tooltip width is roughly 288px (w-72), let's allow some margin
-  // If the calculated left + width > viewport, shift it left
-  if (left + 290 > viewportWidth) {
-      left = viewportWidth - 300;
-  }
-  
-  // Ensure it doesn't go off the left edge
-  left = Math.max(8, left);
-  
-  // Boundary check Bottom (tooltip height ~400px worst case with comparison)
-  // If too low, flip to top
-  if (top + 400 > viewportHeight) {
-      top = Math.max(10, position.y - 410);
-  }
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number; opacity: number }>({ top: 0, left: 0, opacity: 0 });
 
-  const style: React.CSSProperties = {
-    position: 'fixed',
-    zIndex: 100,
-    left: left,
-    top: top,
-    maxWidth: '96vw', // Ensure slightly wider on mobile just in case
-    maxHeight: '90vh',
-    overflowY: 'auto'
-  };
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Measure dimensions
+    const rect = el.getBoundingClientRect();
+    const { innerWidth: vw, innerHeight: vh } = window;
+    const padding = 10;
+    const offset = 15;
+
+    let x = position.x + offset;
+    let y = position.y + offset;
+
+    // --- Smart Horizontal Positioning ---
+    // Default: Right of cursor
+    // If it overflows right edge
+    if (x + rect.width > vw - padding) {
+      // Flip to Left of cursor
+      x = position.x - rect.width - offset; 
+      
+      // If flipped left also overflows left edge (e.g. huge tooltip or narrow screen)
+      if (x < padding) {
+          x = padding; // Clamp to left edge
+      }
+    }
+    
+    // Final safety clamp for right overflow if width > viewport
+    if (x + rect.width > vw) {
+        x = Math.max(padding, vw - rect.width - padding);
+    }
+
+    // --- Smart Vertical Positioning ---
+    // Default: Below cursor
+    // If it overflows bottom edge
+    if (y + rect.height > vh - padding) {
+      // Flip to Above cursor
+      y = position.y - rect.height - offset; 
+      
+      // If flipped top also overflows top edge
+      if (y < padding) {
+          y = padding; // Clamp to top edge
+      }
+    }
+
+    // Apply calculated coords
+    setCoords({ top: y, left: x, opacity: 1 });
+
+  }, [position, item, comparedItem]);
 
   return (
     <div
-      className="pointer-events-none flex flex-col md:flex-row gap-2 items-start animate-in fade-in duration-150 tooltip-card"
-      style={style}
+      ref={containerRef}
+      className="fixed z-[100] flex flex-col md:flex-row gap-2 pointer-events-none transition-opacity duration-150 ease-out max-w-[98vw] flex-wrap md:flex-nowrap"
+      style={{ 
+        top: coords.top, 
+        left: coords.left, 
+        opacity: coords.opacity 
+      }}
     >
       <ItemCard item={item} />
       {comparedItem && <ItemCard item={comparedItem} label="Equipped" isEquipped />}
