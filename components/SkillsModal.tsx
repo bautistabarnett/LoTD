@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { PassiveSkill, ActiveEffect, PassiveTheme, BuildLoadout, PlayerStats, ProcTrigger, Rarity } from '../types';
-import { PASSIVE_THEME_COLORS, PASSIVE_SKILLS_POOL } from '../constants';
+import { PASSIVE_THEME_COLORS, PASSIVE_SKILLS_POOL, COMPOSITE_SYNERGIES } from '../constants';
 import { BaseModal } from './BaseModal';
 
 interface SkillsModalProps {
@@ -34,126 +34,156 @@ const BRANCHES = [
     { id: 'exploration', label: 'Exploration', themes: [PassiveTheme.SCOUTING], icon: '🗺️' }
 ];
 
-// --- DETAILS PANEL COMPONENT (Replaces Tooltip) ---
+// --- DETAILS PANEL COMPONENT ---
 const SkillDetailsPanel = ({
     skill,
     learnedSkill,
     isEquipped,
     isLocked,
-    canAfford,
-    cost,
-    onAction,
+    prerequisiteName,
+    playerPoints,
+    onInvest,
+    onToggleEquip,
     onClose
 }: {
     skill: any;
     learnedSkill?: PassiveSkill;
     isEquipped: boolean;
     isLocked: boolean;
-    canAfford: boolean;
-    cost: number;
-    onAction: () => void;
+    prerequisiteName?: string;
+    playerPoints: number;
+    onInvest: () => void;
+    onToggleEquip: () => void;
     onClose: () => void;
 }) => {
-    const themeStyle = PASSIVE_THEME_COLORS[skill.theme];
-    const currentLevel = learnedSkill ? learnedSkill.level : 0;
+    const themeStyle = PASSIVE_THEME_COLORS[skill.theme as PassiveTheme]; // Added cast for safety though likely 'any' covers it
     const maxRank = skill.maxRank || 10;
+    const currentLevel = learnedSkill ? learnedSkill.level : 0;
     const isMaxed = currentLevel >= maxRank;
+    const cost = 1;
+    const canAfford = playerPoints >= cost;
 
-    let actionLabel = "Unlock";
-    let actionColor = "bg-amber-600 hover:bg-amber-500 text-white";
-    let isDisabled = false;
+    // Calculate Values
+    const currentValue = skill.baseValue + Math.max(0, currentLevel - 1) * skill.valuePerLevel;
+    const nextValue = skill.baseValue + currentLevel * skill.valuePerLevel;
 
-    if (isLocked) {
-        actionLabel = "Locked";
-        actionColor = "bg-stone-800 text-stone-500 border-stone-700";
-        isDisabled = true;
-    } else if (learnedSkill) {
-        if (!isMaxed && canAfford) {
-            actionLabel = `Upgrade (${cost} SP)`;
-            actionColor = "bg-green-700 hover:bg-green-600 text-white border-green-500";
-        } else if (isMaxed) {
-             if (isEquipped) {
-                 actionLabel = "Unequip";
-                 actionColor = "bg-red-900/50 hover:bg-red-800 border-red-700 text-red-200";
-             } else {
-                 actionLabel = "Equip";
-                 actionColor = "bg-stone-700 hover:bg-stone-600 border-stone-500 text-stone-200";
-             }
-        } else {
-             // Not maxed, but can't afford
-             actionLabel = "Not Enough Points";
-             actionColor = "bg-stone-800 text-stone-500";
-             isDisabled = true;
-        }
-        // Hybrid state: Can upgrade OR Equip. Prioritize Equip toggle if maxed, or show Upgrade button primarily?
-        // Logic fix: Allow equipping even if not maxed. 
-        // We need TWO buttons if learned: Equip/Unequip AND Upgrade.
-    } else if (!canAfford) {
-        actionLabel = "Not Enough Points";
-        actionColor = "bg-stone-800 text-stone-500";
-        isDisabled = true;
-    }
+    // Determine relevant Synergy
+    const synergy = COMPOSITE_SYNERGIES.find(s => s.themes.includes(skill.theme));
 
     return (
         <div className="absolute bottom-0 left-0 w-full bg-[#151413] border-t-2 border-amber-600 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] z-50 animate-in slide-in-from-bottom duration-300 pb-safe">
-            <div className="flex flex-col md:flex-row max-w-5xl mx-auto">
+            <div className="flex flex-col md:flex-row max-w-5xl mx-auto h-full max-h-[60vh] md:max-h-auto overflow-y-auto md:overflow-visible">
                 {/* Header Section */}
-                <div className={`p-4 md:p-6 bg-gradient-to-r ${themeStyle.bg} to-transparent md:w-1/3 flex flex-col justify-center relative overflow-hidden`}>
+                <div className={`p-4 md:p-6 bg-gradient-to-r ${themeStyle.bg} to-transparent md:w-1/3 flex flex-col justify-center relative overflow-hidden shrink-0`}>
                     <div className="absolute top-0 right-0 p-4 opacity-10 text-8xl pointer-events-none">{themeStyle.icon}</div>
                     <div className="relative z-10">
                         <div className="flex justify-between items-start">
                              <h3 className={`font-bold diablo-font text-xl md:text-2xl ${skill.rarity === Rarity.UNIQUE ? 'text-amber-500' : 'text-stone-200'} leading-none mb-2`}>{skill.name}</h3>
                              <button onClick={onClose} className="md:hidden text-stone-400 p-2 -mr-2 -mt-2">✕</button>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 mb-2">
                             <span className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded bg-black/40 border border-white/10 ${themeStyle.text}`}>{skill.theme}</span>
                             <span className="text-[10px] text-stone-400 uppercase">Tier {skill.tier}</span>
                         </div>
+                         
+                        {isLocked && prerequisiteName && (
+                            <div className="text-red-400 text-xs flex items-center gap-1 font-bold bg-black/50 p-1 rounded w-fit">
+                                🔒 Requires: {prerequisiteName}
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 {/* Content Section */}
                 <div className="p-4 md:p-6 flex-grow bg-stone-900/80 md:w-2/3 flex flex-col gap-4">
-                    <div className="text-sm text-stone-300 leading-relaxed italic">
-                        {skill.description.replace('{value}', `[${skill.baseValue + ((currentLevel || 1) - 1) * skill.valuePerLevel}]`)}
+                    
+                    {/* Description & Stats */}
+                    <div>
+                        <div className="text-sm text-stone-300 leading-relaxed italic mb-3">
+                            {skill.description.replace('{value}', `[${currentValue}]`)}
+                        </div>
+                        
+                        {/* Stat Scaling Preview */}
+                        {!isMaxed && (
+                            <div className="text-xs font-mono text-stone-500 flex gap-4 bg-black/30 p-2 rounded border border-white/5">
+                                <div>Current Value: <span className="text-stone-300">{currentValue}</span></div>
+                                <div className="text-stone-600">➜</div>
+                                <div>Next Rank: <span className="text-green-400">{nextValue}</span></div>
+                            </div>
+                        )}
                     </div>
                     
+                    {/* Proc / Effect Details */}
                     {skill.proc && (
-                         <div className="bg-black/40 border border-stone-800 rounded p-2 text-xs flex gap-2 items-start">
-                             <span className="text-amber-500 font-bold shrink-0">Effect:</span> 
-                             <span className="text-stone-400">{skill.proc.description}</span>
+                         <div className="bg-black/40 border border-stone-800 rounded p-2 text-xs grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 items-start">
+                             <span className="text-amber-500 font-bold">Effect:</span> 
+                             <span className="text-stone-300">{skill.proc.description}</span>
+                             
+                             <span className="text-stone-500">Trigger:</span>
+                             <span className="text-stone-400 capitalize">{skill.proc.trigger.replace('on', '')}</span>
+                             
+                             {skill.proc.chance < 1 && (
+                                <>
+                                    <span className="text-stone-500">Chance:</span>
+                                    <span className="text-stone-400">{Math.round(skill.proc.chance * 100)}%</span>
+                                </>
+                             )}
+                             
+                             {skill.proc.cooldown > 0 && (
+                                <>
+                                    <span className="text-stone-500">Cooldown:</span>
+                                    <span className="text-stone-400">{skill.proc.cooldown} Turns</span>
+                                </>
+                             )}
                          </div>
                     )}
+                    
+                    {/* Synergy Hint */}
+                    {synergy && (
+                        <div className="text-[10px] text-stone-500">
+                            <span className="text-purple-400 font-bold">Synergy:</span> Part of <span className="text-stone-300">{synergy.name}</span> combination.
+                        </div>
+                    )}
 
-                    <div className="flex items-center gap-4 mt-auto">
+                    {/* Actions */}
+                    <div className="flex items-center gap-4 mt-auto border-t border-white/5 pt-4">
                          <div className="flex flex-col border-r border-stone-700 pr-4">
                              <span className="text-[10px] text-stone-500 uppercase font-bold">Rank</span>
-                             <span className="text-white font-mono text-lg">{currentLevel}/{maxRank}</span>
+                             <span className={`font-mono text-lg ${isMaxed ? 'text-amber-500' : 'text-white'}`}>{currentLevel}/{maxRank}</span>
                          </div>
                          
-                         <div className="flex-grow flex gap-2 justify-end">
-                             {/* Separate Equip/Unequip Logic from Upgrade */}
+                         <div className="flex-grow flex gap-3 justify-end items-center">
+                             
+                             {/* Equip Toggle */}
                              {learnedSkill && (
                                  <button 
-                                    onClick={() => isEquipped ? onAction() : onAction()} // This needs to be passed correctly
-                                    className={`px-4 py-3 font-bold uppercase tracking-widest text-xs rounded border transition-all ${isEquipped ? 'bg-red-900/20 border-red-800 text-red-400 hover:bg-red-900/40' : 'bg-stone-800 border-stone-600 text-stone-300 hover:bg-stone-700'}`}
+                                    onClick={onToggleEquip}
+                                    className={`px-4 py-3 font-bold uppercase tracking-widest text-xs rounded border transition-all flex-1 md:flex-none ${isEquipped ? 'bg-red-900/20 border-red-800 text-red-400 hover:bg-red-900/40' : 'bg-stone-800 border-stone-600 text-stone-300 hover:bg-stone-700'}`}
                                  >
                                      {isEquipped ? 'Unequip' : 'Equip'}
                                  </button>
                              )}
 
+                             {/* Invest Point */}
                              {(!isMaxed) && (
                                  <button
-                                     onClick={onAction}
-                                     disabled={isDisabled}
-                                     className={`flex-grow md:flex-grow-0 px-6 py-3 font-bold uppercase tracking-widest text-xs rounded border transition-all shadow-lg active:scale-95 ${isDisabled ? 'bg-stone-800 border-stone-700 text-stone-600 cursor-not-allowed' : 'bg-amber-700 border-amber-600 text-white hover:bg-amber-600'}`}
+                                     onClick={onInvest}
+                                     disabled={!canAfford || isLocked}
+                                     className={`flex-grow md:flex-grow-0 px-6 py-3 font-bold uppercase tracking-widest text-xs rounded border transition-all shadow-lg active:scale-95 flex flex-col items-center justify-center min-w-[140px]
+                                        ${(!canAfford || isLocked) 
+                                            ? 'bg-stone-800 border-stone-700 text-stone-600 cursor-not-allowed' 
+                                            : 'bg-amber-700 border-amber-600 text-white hover:bg-amber-600'}
+                                     `}
                                  >
-                                     {learnedSkill ? `Upgrade (${cost} SP)` : `Unlock (${cost} SP)`}
+                                     <span>{learnedSkill ? 'Upgrade Skill' : 'Unlock Skill'}</span>
+                                     <span className="text-9 font-normal opacity-70">{cost} Skill Point</span>
                                  </button>
                              )}
                              
-                             {isMaxed && !learnedSkill && ( /* Should not happen logic wise but fallback */
-                                 <div className="text-amber-500 font-bold text-sm uppercase px-4 py-2 border border-amber-900 bg-amber-950/30 rounded">Maxed</div>
+                             {isMaxed && (
+                                 <div className="text-amber-500 font-bold text-sm uppercase px-4 py-2 border border-amber-900 bg-amber-950/30 rounded flex-1 md:flex-none text-center">
+                                     Max Rank
+                                 </div>
                              )}
                          </div>
                     </div>
@@ -164,7 +194,17 @@ const SkillDetailsPanel = ({
 };
 
 // --- TREE NODE ---
-const TreeNode = ({ 
+interface TreeNodeProps {
+    node: any;
+    learnedSkill?: PassiveSkill;
+    isActive: boolean;
+    isLocked: boolean;
+    canAfford: boolean;
+    isSelected: boolean;
+    onClick: () => void;
+}
+
+const TreeNode: React.FC<TreeNodeProps> = ({ 
     node, 
     learnedSkill, 
     isActive, 
@@ -172,16 +212,8 @@ const TreeNode = ({
     canAfford,
     isSelected,
     onClick,
-}: { 
-    node: any, 
-    learnedSkill?: PassiveSkill,
-    isActive: boolean,
-    isLocked: boolean,
-    canAfford: boolean,
-    isSelected: boolean,
-    onClick: () => void,
 }) => {
-    const themeStyle = PASSIVE_THEME_COLORS[node.theme];
+    const themeStyle = PASSIVE_THEME_COLORS[node.theme as PassiveTheme];
     const level = learnedSkill ? learnedSkill.level : 0;
     const maxRank = node.maxRank || 10;
     const isMaxed = level >= maxRank;
@@ -225,7 +257,10 @@ const TreeNode = ({
             }}
         >
             <button
-                onPointerUp={(e) => { e.stopPropagation(); onClick(); }} // PointerUp to work well with Pan gestures
+                onClick={(e) => {
+                    e.stopPropagation();
+                    onClick();
+                }}
                 className={`
                     w-16 h-16 rounded-md border-2 flex items-center justify-center relative shadow-lg transition-all duration-200 z-10
                     ${borderClass} ${bgClass} ${scaleClass}
@@ -244,6 +279,13 @@ const TreeNode = ({
                     <div className="absolute -top-1 -left-1 w-3 h-3 bg-green-500 rounded-full shadow-[0_0_5px_lime] animate-pulse"></div>
                 )}
             </button>
+            
+            {/* Locked Padlock */}
+            {isLocked && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-stone-500 text-2xl drop-shadow-md z-30 pointer-events-none">
+                    🔒
+                </div>
+            )}
         </div>
     );
 };
@@ -268,8 +310,8 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const containerRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
-  const lastPos = useRef({ x: 0, y: 0 });
-  const lastDist = useRef<number | null>(null); // For pinch zoom
+  const startPos = useRef({ x: 0, y: 0 });
+  const lastDist = useRef<number | null>(null);
 
   // Filter skills for current branch
   const currentBranch = BRANCHES.find(b => b.id === selectedBranchId)!;
@@ -291,21 +333,25 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
   }).filter(Boolean);
 
   // --- INTERACTION HANDLERS ---
-
   const handlePointerDown = (e: React.PointerEvent) => {
       if (e.target !== containerRef.current && !(e.target as HTMLElement).classList.contains('canvas-layer')) return;
-      isDragging.current = false; // Reset, will set to true on move
-      lastPos.current = { x: e.clientX, y: e.clientY };
+      isDragging.current = false; 
+      startPos.current = { x: e.clientX, y: e.clientY };
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-      if (!e.buttons) return; // Only if clicked
-      isDragging.current = true;
-      const dx = e.clientX - lastPos.current.x;
-      const dy = e.clientY - lastPos.current.y;
-      setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
-      lastPos.current = { x: e.clientX, y: e.clientY };
+      if (!e.buttons) return;
+      
+      const dx = e.clientX - startPos.current.x;
+      const dy = e.clientY - startPos.current.y;
+      
+      // Simple threshold to determine drag vs click
+      if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+          isDragging.current = true;
+          setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+          startPos.current = { x: e.clientX, y: e.clientY };
+      }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -323,12 +369,15 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
           lastDist.current = dist;
       } else if (e.touches.length === 1) {
           // Pan
-          isDragging.current = true;
           const touch = e.touches[0];
-          const dx = touch.clientX - lastPos.current.x;
-          const dy = touch.clientY - lastPos.current.y;
-          setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
-          lastPos.current = { x: touch.clientX, y: touch.clientY };
+          const dx = touch.clientX - startPos.current.x;
+          const dy = touch.clientY - startPos.current.y;
+          
+           if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+               isDragging.current = true;
+               setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }));
+               startPos.current = { x: touch.clientX, y: touch.clientY };
+           }
       }
   };
 
@@ -339,7 +388,7 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
           lastDist.current = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
       } else {
           lastDist.current = null;
-          lastPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          startPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
           isDragging.current = false;
       }
   };
@@ -350,33 +399,28 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
       setTransform(prev => ({ ...prev, scale: Math.min(2, Math.max(0.5, prev.scale + delta)) }));
   };
 
-  // Center tree on branch change
   useEffect(() => {
       setTransform({ x: 0, y: 0, scale: 1 });
       setSelectedNodeId(null);
   }, [selectedBranchId]);
 
-  const handleAction = () => {
+  const handleNodeClick = (nodeId: string) => {
+      if (!isDragging.current) {
+          setSelectedNodeId(nodeId);
+      }
+  };
+
+  const handleInvestPoint = () => {
       if (!selectedNodeId) return;
-      const learned = passiveSkills.find(s => s.id === selectedNodeId);
-      const poolNode = treeNodes.find(n => n.id === selectedNodeId);
-      
-      if (learned) {
-          const maxRank = poolNode?.maxRank || 10;
-          if (learned.level < maxRank && playerStats.skillPoints > 0) {
-              // Priority: Upgrade if points available and not maxed? 
-              // UX: Usually people want to toggle equip if learned. But upgrade is important.
-              // Let's rely on the separate buttons in the details panel.
-              // This function handles the MAIN button action which is ambiguous in the generic handler.
-              // See `SkillDetailsPanel` for granular calls.
-          }
-          // The detail panel calls specific logic now, so this generic one is less used, 
-          // but we map it to Unlock/Upgrade if possible, else Equip toggle.
-          if (learned.level < maxRank && playerStats.skillPoints > 0) onUnlockTreeSkill(selectedNodeId);
-          else if (equippedSkillIds.includes(selectedNodeId)) onUnequip(selectedNodeId);
-          else onEquip(selectedNodeId);
+      onUnlockTreeSkill(selectedNodeId);
+  };
+
+  const handleToggleEquip = () => {
+      if (!selectedNodeId) return;
+      if (equippedSkillIds.includes(selectedNodeId)) {
+          onUnequip(selectedNodeId);
       } else {
-          onUnlockTreeSkill(selectedNodeId);
+          onEquip(selectedNodeId);
       }
   };
 
@@ -389,6 +433,13 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
 
   const selectedNode = selectedNodeId ? treeNodes.find(n => n.id === selectedNodeId) : null;
   const learnedSelected = selectedNode ? passiveSkills.find(s => s.id === selectedNode.id) : undefined;
+  
+  // Resolve Prereq Name
+  let prereqName = undefined;
+  if (selectedNode?.prerequisiteId) {
+      const p = PASSIVE_SKILLS_POOL.find(s => s.id === selectedNode.prerequisiteId);
+      if(p) prereqName = p.name;
+  }
 
   return (
     <BaseModal.Container zIndex="z-[60]" maxWidth="max-w-7xl" className="h-[100dvh] md:h-[90vh] shadow-2xl border-stone-800">
@@ -479,16 +530,15 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
                                     position: 'absolute',
                                     left: 0,
                                     top: 0,
-                                    // Use a large centralized area for the tree
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center'
                                 }}
                              >
-                                 {/* Actual Tree Content Wrapper - Centered */}
+                                 {/* Actual Tree Content Wrapper */}
                                  <div className="relative" style={{ width: TREE_CANVAS_WIDTH, height: 800 }}>
                                     
-                                     {/* Background Grid for Depth */}
+                                     {/* Background Grid */}
                                      <div className="absolute -inset-[1000px] bg-[radial-gradient(#333_1px,transparent_1px)] [background-size:40px_40px] opacity-10 pointer-events-none"></div>
 
                                      {/* Connections Layer */}
@@ -521,9 +571,7 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
                                                   isLocked={locked}
                                                   isSelected={selectedNodeId === node.id}
                                                   canAfford={playerStats.skillPoints > 0}
-                                                  onClick={() => {
-                                                      if (!isDragging.current) setSelectedNodeId(node.id);
-                                                  }}
+                                                  onClick={() => handleNodeClick(node.id)}
                                               />
                                           );
                                      })}
@@ -552,14 +600,15 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
                     learnedSkill={learnedSelected}
                     isEquipped={equippedSkillIds.includes(selectedNode.id)}
                     isLocked={isNodeLocked(selectedNode.id, selectedNode.prerequisiteId)}
-                    canAfford={playerStats.skillPoints > 0}
-                    cost={1}
-                    onAction={handleAction} // Generic action
+                    prerequisiteName={prereqName}
+                    playerPoints={playerStats.skillPoints}
+                    onInvest={handleInvestPoint}
+                    onToggleEquip={handleToggleEquip}
                     onClose={() => setSelectedNodeId(null)}
                 />
             )}
 
-            {/* EFFECTS TAB (Unchanged layout, just ensuring scroll) */}
+            {/* EFFECTS TAB */}
             {activeTab === 'effects' && (
                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto h-full bg-stone-900">
                     {activeEffects.length === 0 && (
