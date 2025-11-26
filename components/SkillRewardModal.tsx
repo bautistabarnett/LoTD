@@ -78,4 +78,4 @@ const SkillRewardModal: React.FC<SkillRewardModalProps> = ({ skill, isUpgrade, o
   );
 };
 
-export default SkillRewardModal;
+export default React.memo(SkillRewardModal);

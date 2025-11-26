@@ -1,6 +1,6 @@
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { PassiveSkill, ActiveEffect, PassiveTheme, BuildLoadout, PlayerStats, ProcTrigger, Rarity } from '../types';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { PassiveSkill, ActiveEffect, PassiveTheme, BuildLoadout, PlayerStats, Rarity } from '../types';
 import { PASSIVE_THEME_COLORS, PASSIVE_SKILLS_POOL, COMPOSITE_SYNERGIES } from '../constants';
 import { BaseModal } from './BaseModal';
 
@@ -35,7 +35,7 @@ const BRANCHES = [
 ];
 
 // --- DETAILS PANEL COMPONENT ---
-const SkillDetailsPanel = ({
+const SkillDetailsPanel = React.memo(({
     skill,
     learnedSkill,
     isEquipped,
@@ -56,7 +56,7 @@ const SkillDetailsPanel = ({
     onToggleEquip: () => void;
     onClose: () => void;
 }) => {
-    const themeStyle = PASSIVE_THEME_COLORS[skill.theme as PassiveTheme]; // Added cast for safety though likely 'any' covers it
+    const themeStyle = PASSIVE_THEME_COLORS[skill.theme as PassiveTheme];
     const maxRank = skill.maxRank || 10;
     const currentLevel = learnedSkill ? learnedSkill.level : 0;
     const isMaxed = currentLevel >= maxRank;
@@ -68,7 +68,7 @@ const SkillDetailsPanel = ({
     const nextValue = skill.baseValue + currentLevel * skill.valuePerLevel;
 
     // Determine relevant Synergy
-    const synergy = COMPOSITE_SYNERGIES.find(s => s.themes.includes(skill.theme));
+    const synergy = useMemo(() => COMPOSITE_SYNERGIES.find(s => s.themes.includes(skill.theme)), [skill.theme]);
 
     return (
         <div className="absolute bottom-0 left-0 w-full bg-[#151413] border-t-2 border-amber-600 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] z-50 animate-in slide-in-from-bottom duration-300 pb-safe">
@@ -191,7 +191,7 @@ const SkillDetailsPanel = ({
             </div>
         </div>
     );
-};
+});
 
 // --- TREE NODE ---
 interface TreeNodeProps {
@@ -204,7 +204,7 @@ interface TreeNodeProps {
     onClick: () => void;
 }
 
-const TreeNode: React.FC<TreeNodeProps> = ({ 
+const TreeNode: React.FC<TreeNodeProps> = React.memo(({ 
     node, 
     learnedSkill, 
     isActive, 
@@ -288,7 +288,7 @@ const TreeNode: React.FC<TreeNodeProps> = ({
             )}
         </div>
     );
-};
+});
 
 
 // --- MAIN MODAL ---
@@ -314,11 +314,11 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
   const lastDist = useRef<number | null>(null);
 
   // Filter skills for current branch
-  const currentBranch = BRANCHES.find(b => b.id === selectedBranchId)!;
-  const treeNodes = PASSIVE_SKILLS_POOL.filter(s => currentBranch.themes.includes(s.theme));
+  const currentBranch = useMemo(() => BRANCHES.find(b => b.id === selectedBranchId)!, [selectedBranchId]);
+  const treeNodes = useMemo(() => PASSIVE_SKILLS_POOL.filter(s => currentBranch.themes.includes(s.theme)), [currentBranch]);
 
   // Determine Connections for SVG
-  const connections = treeNodes.map(node => {
+  const connections = useMemo(() => treeNodes.map(node => {
       if (!node.prerequisiteId) return null;
       const parent = treeNodes.find(p => p.id === node.prerequisiteId);
       if (!parent) return null;
@@ -330,7 +330,7 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
           toY: (node.tier - 1) * TIER_ROW_HEIGHT + 40,
           isUnlocked: passiveSkills.some(s => s.id === parent.id)
       };
-  }).filter(Boolean);
+  }).filter(Boolean), [treeNodes, passiveSkills]);
 
   // --- INTERACTION HANDLERS ---
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -404,42 +404,44 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
       setSelectedNodeId(null);
   }, [selectedBranchId]);
 
-  const handleNodeClick = (nodeId: string) => {
+  const handleNodeClick = useCallback((nodeId: string) => {
       if (!isDragging.current) {
           setSelectedNodeId(nodeId);
       }
-  };
+  }, []);
 
-  const handleInvestPoint = () => {
+  const handleInvestPoint = useCallback(() => {
       if (!selectedNodeId) return;
       onUnlockTreeSkill(selectedNodeId);
-  };
+  }, [selectedNodeId, onUnlockTreeSkill]);
 
-  const handleToggleEquip = () => {
+  const handleToggleEquip = useCallback(() => {
       if (!selectedNodeId) return;
       if (equippedSkillIds.includes(selectedNodeId)) {
           onUnequip(selectedNodeId);
       } else {
           onEquip(selectedNodeId);
       }
-  };
+  }, [selectedNodeId, equippedSkillIds, onUnequip, onEquip]);
 
-  const isNodeLocked = (nodeId: string, prerequisiteId?: string) => {
+  const isNodeLocked = useCallback((nodeId: string, prerequisiteId?: string) => {
       const learned = passiveSkills.some(s => s.id === nodeId);
       if (learned) return false;
       if (!prerequisiteId) return false;
       return !passiveSkills.some(s => s.id === prerequisiteId);
-  };
+  }, [passiveSkills]);
 
-  const selectedNode = selectedNodeId ? treeNodes.find(n => n.id === selectedNodeId) : null;
-  const learnedSelected = selectedNode ? passiveSkills.find(s => s.id === selectedNode.id) : undefined;
+  const selectedNode = useMemo(() => selectedNodeId ? treeNodes.find(n => n.id === selectedNodeId) : null, [selectedNodeId, treeNodes]);
+  const learnedSelected = useMemo(() => selectedNode ? passiveSkills.find(s => s.id === selectedNode.id) : undefined, [selectedNode, passiveSkills]);
   
   // Resolve Prereq Name
-  let prereqName = undefined;
-  if (selectedNode?.prerequisiteId) {
-      const p = PASSIVE_SKILLS_POOL.find(s => s.id === selectedNode.prerequisiteId);
-      if(p) prereqName = p.name;
-  }
+  const prereqName = useMemo(() => {
+      if (selectedNode?.prerequisiteId) {
+          const p = PASSIVE_SKILLS_POOL.find(s => s.id === selectedNode.prerequisiteId);
+          if(p) return p.name;
+      }
+      return undefined;
+  }, [selectedNode]);
 
   return (
     <BaseModal.Container zIndex="z-[60]" maxWidth="max-w-7xl" className="h-[100dvh] md:h-[90vh] shadow-2xl border-stone-800">
@@ -636,4 +638,4 @@ const SkillsModal: React.FC<SkillsModalProps> = ({
   );
 };
 
-export default SkillsModal;
+export default React.memo(SkillsModal);

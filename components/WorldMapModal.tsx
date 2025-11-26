@@ -1,6 +1,5 @@
 
-
-import React from 'react';
+import React, { useMemo } from 'react';
 import { MapNode } from '../types';
 import GameIcon from './GameIcon';
 import { BaseModal } from './BaseModal';
@@ -23,13 +22,13 @@ const WorldMapModal: React.FC<WorldMapModalProps> = ({
   
   const getNode = (id: string) => nodes.find(n => n.id === id);
 
-  const renderConnections = () => {
+  const connectionLines = useMemo(() => {
     const lines: React.ReactNode[] = [];
     const processedConnections = new Set<string>();
 
     nodes.forEach(node => {
       node.connections.forEach(targetId => {
-        const target = getNode(targetId);
+        const target = nodes.find(n => n.id === targetId);
         if (!target) return;
 
         const key = [node.id, targetId].sort().join('-');
@@ -54,7 +53,7 @@ const WorldMapModal: React.FC<WorldMapModalProps> = ({
       });
     });
     return lines;
-  };
+  }, [nodes]);
 
   const currentNode = getNode(currentNodeId);
 
@@ -72,7 +71,7 @@ const WorldMapModal: React.FC<WorldMapModalProps> = ({
            <div className="relative w-[150%] h-[150%] md:w-full md:h-full bg-[url('https://www.transparenttextures.com/patterns/cartographer.png')]">
               {/* Background SVG for Lines */}
               <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
-                {renderConnections()}
+                {connectionLines}
               </svg>
 
               {/* Nodes */}
@@ -177,4 +176,4 @@ const WorldMapModal: React.FC<WorldMapModalProps> = ({
   );
 };
 
-export default WorldMapModal;
+export default React.memo(WorldMapModal);

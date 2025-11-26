@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import GameIcon from './GameIcon';
 import { Item } from '../types';
@@ -129,4 +130,4 @@ const VisualizerModal: React.FC<VisualizerModalProps> = ({ target, onSave, onClo
   );
 };
 
-export default VisualizerModal;
+export default React.memo(VisualizerModal);

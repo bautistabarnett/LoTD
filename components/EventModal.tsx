@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ExplorationEvent, EventType } from '../types';
 import { BaseModal } from './BaseModal';
@@ -76,4 +77,4 @@ const EventModal: React.FC<EventModalProps> = ({ event, onClose }) => {
   );
 };
 
-export default EventModal;
+export default React.memo(EventModal);

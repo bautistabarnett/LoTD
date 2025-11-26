@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useMemo } from 'react';
 import { PassiveSkill, BaseAttributes } from '../types';
 import { PASSIVE_THEME_COLORS } from '../constants';
 import { BaseModal } from './BaseModal';
@@ -23,12 +24,12 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({
   onClose 
 }) => {
   
-  const stats: { key: keyof BaseAttributes; label: string; color: string }[] = [
+  const stats: { key: keyof BaseAttributes; label: string; color: string }[] = useMemo(() => [
     { key: 'strength', label: 'Strength', color: 'text-red-500' },
     { key: 'dexterity', label: 'Dexterity', color: 'text-green-500' },
     { key: 'intelligence', label: 'Intelligence', color: 'text-blue-500' },
     { key: 'vitality', label: 'Vitality', color: 'text-purple-500' }
-  ];
+  ], []);
 
   const themeStyles = newPassive ? PASSIVE_THEME_COLORS[newPassive.theme] : null;
 
@@ -129,4 +130,4 @@ const LevelUpModal: React.FC<LevelUpModalProps> = ({
   );
 };
 
-export default LevelUpModal;
+export default React.memo(LevelUpModal);

@@ -69,4 +69,4 @@ const SystemModal: React.FC<SystemModalProps> = ({ currentSlotId, onSave, onQuit
   );
 };
 
-export default SystemModal;
+export default React.memo(SystemModal);

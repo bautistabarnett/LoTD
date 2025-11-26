@@ -258,4 +258,4 @@ const BalanceDashboard: React.FC<BalanceDashboardProps> = ({ playerStats, curren
   );
 };
 
-export default BalanceDashboard;
+export default React.memo(BalanceDashboard);

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { SmugglingBundle, Item, Rarity } from '../types';
 import { SMUGGLING_BUNDLES, RARITY_COLORS } from '../constants';
@@ -157,7 +158,7 @@ const SmugglingModal: React.FC<SmugglingModalProps> = ({
                         {purchasedItem.rarity} {purchasedItem.type}
                     </div>
 
-                    <div className="button-group md:flex md:gap-4 w-full">
+                    <div className="button-group md:flex md:flex-row md:gap-4 w-full">
                         <button 
                             onClick={handleDiscard}
                             className="flex-1 py-3 border border-stone-600 text-stone-400 hover:bg-stone-800 hover:text-white font-bold uppercase tracking-widest rounded transition-colors text-xs md:text-sm"
@@ -178,4 +179,4 @@ const SmugglingModal: React.FC<SmugglingModalProps> = ({
   );
 };
 
-export default SmugglingModal;
+export default React.memo(SmugglingModal);

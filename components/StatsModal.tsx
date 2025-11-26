@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useMemo } from 'react';
 import { PlayerStats, BaseAttributes, PassiveSkill } from '../types';
 import { PASSIVE_THEME_COLORS } from '../constants';
 import GameIcon from './GameIcon';
@@ -22,14 +23,14 @@ const StatsModal: React.FC<StatsModalProps> = ({
   onClose 
 }) => {
   
-  const attributes = [
+  const attributes = useMemo(() => [
     { label: 'Strength', key: 'strength', val: stats.strength, base: baseAttributes.strength, color: 'text-red-500', desc: 'Increases Damage' },
     { label: 'Dexterity', key: 'dexterity', val: stats.dexterity, base: baseAttributes.dexterity, color: 'text-green-500', desc: 'Increases Armor & Dodge' },
     { label: 'Intelligence', key: 'intelligence', val: stats.intelligence, base: baseAttributes.intelligence, color: 'text-blue-500', desc: 'Increases Crit Chance' },
     { label: 'Vitality', key: 'vitality', val: stats.vitality, base: baseAttributes.vitality, color: 'text-purple-500', desc: 'Increases Health' },
-  ];
+  ], [stats, baseAttributes]);
 
-  const combatStats = [
+  const combatStats = useMemo(() => [
     { label: 'Damage', val: stats.damage, icon: '⚔️' },
     { label: 'Armor', val: stats.armor, icon: '🛡️' },
     { label: 'Max HP', val: stats.maxHp, icon: '❤️' },
@@ -37,7 +38,7 @@ const StatsModal: React.FC<StatsModalProps> = ({
     { label: 'Crit Chance', val: `${stats.critChance}%`, icon: '⚡' },
     { label: 'Dodge Chance', val: `${stats.dodgeChance}%`, icon: '💨' },
     { label: 'Magic Find', val: `${stats.magicFind}%`, icon: '🍀' },
-  ];
+  ], [stats]);
 
   return (
     <BaseModal.Container zIndex="z-[90]" maxWidth="max-w-4xl" className="max-h-[100dvh] md:max-h-[90vh]">
@@ -145,4 +146,4 @@ const StatsModal: React.FC<StatsModalProps> = ({
   );
 };
 
-export default StatsModal;
+export default React.memo(StatsModal);

@@ -21,14 +21,14 @@ interface CombatModalProps {
 
 interface FloatingNumber { id: number; value: string; type: 'damage' | 'heal' | 'crit' | 'miss'; x: number; }
 
-const FloatingText: React.FC<{ num: FloatingNumber }> = ({ num }) => {
+const FloatingText: React.FC<{ num: FloatingNumber }> = React.memo(({ num }) => {
   const color = num.type === 'heal' ? 'text-green-400' : num.type === 'crit' ? 'text-yellow-400 scale-150' : num.type === 'miss' ? 'text-blue-300' : 'text-red-500';
   return (
     <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-bold diablo-font text-2xl md:text-4xl lg:text-5xl pointer-events-none z-50 drop-shadow-md animate-float-up ${color}`} style={{ marginLeft: `${num.x}px`, textShadow: '0 2px 4px rgba(0,0,0,1)' }}>{num.value}</div>
   );
-};
+});
 
-const StatPlate: React.FC<{ label: string; value: string | number; icon: string; color?: string }> = ({ label, value, icon, color = 'text-stone-200' }) => (
+const StatPlate: React.FC<{ label: string; value: string | number; icon: string; color?: string }> = React.memo(({ label, value, icon, color = 'text-stone-200' }) => (
     <div className="bg-black/60 border border-stone-700 rounded px-2 py-1 flex items-center gap-2 min-w-[60px] md:min-w-[80px] lg:min-w-[100px] justify-center shadow-sm">
         <span className="text-[10px] md:text-xs lg:text-sm opacity-70 grayscale">{icon}</span>
         <div className="flex flex-col leading-none">
@@ -36,9 +36,9 @@ const StatPlate: React.FC<{ label: string; value: string | number; icon: string;
             <span className={`text-[10px] md:text-xs lg:text-sm font-mono font-bold ${color}`}>{value}</span>
         </div>
     </div>
-);
+));
 
-const HealthBar: React.FC<{ current: number; max: number; isEnemy?: boolean; label?: string }> = ({ current, max, isEnemy, label }) => {
+const HealthBar: React.FC<{ current: number; max: number; isEnemy?: boolean; label?: string }> = React.memo(({ current, max, isEnemy, label }) => {
   const percentage = Math.max(0, Math.min(100, (current / max) * 100));
   const barColor = isEnemy ? 'bg-gradient-to-r from-red-900 via-red-600 to-red-900' : 'bg-gradient-to-r from-green-900 via-green-600 to-green-900';
   
@@ -56,7 +56,7 @@ const HealthBar: React.FC<{ current: number; max: number; isEnemy?: boolean; lab
        {label && <div className={`absolute -top-3 md:-top-4 ${isEnemy ? 'right-0' : 'left-0'} text-[8px] md:text-[10px] font-bold text-stone-500 uppercase tracking-widest bg-black/40 px-1 rounded`}>{label}</div>}
     </div>
   );
-};
+});
 
 const EFFECT_ICONS: Record<string, string> = { 
     burn: '🔥', freeze: '❄️', poison: '🤢', blind: '🙈', regen: '💖', 
@@ -66,7 +66,7 @@ const EFFECT_ICONS: Record<string, string> = {
 
 type AnyEffect = CombatStatusEffect | ActiveEffect | MaledictAffix;
 
-const AuraTooltip: React.FC<{ effect: AnyEffect; rect: DOMRect | null }> = ({ effect, rect }) => {
+const AuraTooltip: React.FC<{ effect: AnyEffect; rect: DOMRect | null }> = React.memo(({ effect, rect }) => {
   if (!rect) return null;
 
   const viewportHeight = window.innerHeight;
@@ -134,13 +134,13 @@ const AuraTooltip: React.FC<{ effect: AnyEffect; rect: DOMRect | null }> = ({ ef
     </div>,
     document.body
   );
-};
+});
 
 const AuraBadge: React.FC<{ 
     effect: AnyEffect; 
     onHover: (e: React.MouseEvent<HTMLDivElement>, effect: AnyEffect) => void; 
     onLeave: () => void; 
-}> = ({ effect, onHover, onLeave }) => {
+}> = React.memo(({ effect, onHover, onLeave }) => {
     
     const isCombat = (e: any): e is CombatStatusEffect => 'type' in e && 'stacks' in e;
     const isMaledict = (e: any): e is MaledictAffix => 'statModifiers' in e;
@@ -192,7 +192,7 @@ const AuraBadge: React.FC<{
             )}
         </div>
     );
-};
+});
 
 const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monster, onFlee, combatLog, isPlayerTurn, combatStatusEffects, activeEffects, combatStance, onSetStance, turnQueue }) => {
   const rarityConfig = BALANCE.MONSTER.rarityConfig[monster.rarity];
@@ -340,4 +340,4 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
   );
 };
 
-export default CombatModal;
+export default React.memo(CombatModal);
