@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Monster, PlayerStats, CombatStatusEffect, ActiveEffect, CombatStance, MaledictAffix } from '../types';
@@ -28,11 +29,11 @@ const FloatingText: React.FC<{ num: FloatingNumber }> = ({ num }) => {
 };
 
 const StatPlate: React.FC<{ label: string; value: string | number; icon: string; color?: string }> = ({ label, value, icon, color = 'text-stone-200' }) => (
-    <div className="bg-black/40 border border-stone-700 rounded px-2 py-1 lg:px-4 lg:py-2 flex items-center gap-2 min-w-[80px] lg:min-w-[100px]">
-        <span className="text-xs lg:text-sm opacity-70 grayscale">{icon}</span>
+    <div className="bg-black/60 border border-stone-700 rounded px-2 py-1 flex items-center gap-2 min-w-[60px] md:min-w-[80px] lg:min-w-[100px] justify-center shadow-sm">
+        <span className="text-[10px] md:text-xs lg:text-sm opacity-70 grayscale">{icon}</span>
         <div className="flex flex-col leading-none">
-            <span className="text-[9px] lg:text-[11px] text-stone-500 uppercase font-bold">{label}</span>
-            <span className={`text-xs lg:text-sm font-mono font-bold ${color}`}>{value}</span>
+            <span className="text-[8px] md:text-[9px] lg:text-[11px] text-stone-500 uppercase font-bold">{label}</span>
+            <span className={`text-[10px] md:text-xs lg:text-sm font-mono font-bold ${color}`}>{value}</span>
         </div>
     </div>
 );
@@ -43,16 +44,16 @@ const HealthBar: React.FC<{ current: number; max: number; isEnemy?: boolean; lab
   
   return (
     <div className="w-full relative group shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-       <div className="h-6 lg:h-8 bg-black border border-stone-600 rounded relative overflow-hidden">
+       <div className="h-4 md:h-6 lg:h-8 bg-black border border-stone-600 rounded relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30"></div>
           <div className={`h-full transition-all duration-300 ease-out ${barColor} relative`} style={{ width: `${percentage}%` }}>
               <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent"></div>
           </div>
-          <div className="absolute inset-0 flex items-center justify-center text-[10px] lg:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,1)] z-10 font-mono tracking-widest">
+          <div className="absolute inset-0 flex items-center justify-center text-[9px] md:text-[10px] lg:text-xs font-bold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,1)] z-10 font-mono tracking-widest">
              {Math.ceil(current)} / {max}
           </div>
        </div>
-       {label && <div className={`absolute -top-4 ${isEnemy ? 'right-0' : 'left-0'} text-[10px] font-bold text-stone-500 uppercase tracking-widest`}>{label}</div>}
+       {label && <div className={`absolute -top-3 md:-top-4 ${isEnemy ? 'right-0' : 'left-0'} text-[8px] md:text-[10px] font-bold text-stone-500 uppercase tracking-widest bg-black/40 px-1 rounded`}>{label}</div>}
     </div>
   );
 };
@@ -63,7 +64,6 @@ const EFFECT_ICONS: Record<string, string> = {
     scaling_strength: '💪', dodge_boost: '💨' 
 };
 
-// Unified Effect Types
 type AnyEffect = CombatStatusEffect | ActiveEffect | MaledictAffix;
 
 const AuraTooltip: React.FC<{ effect: AnyEffect; rect: DOMRect | null }> = ({ effect, rect }) => {
@@ -73,7 +73,6 @@ const AuraTooltip: React.FC<{ effect: AnyEffect; rect: DOMRect | null }> = ({ ef
   const viewportWidth = window.innerWidth;
   const tooltipWidth = 240;
   
-  // Calculate Position
   const spaceAbove = rect.top;
   const spaceBelow = viewportHeight - rect.bottom;
   const showBelow = spaceAbove < 160 && spaceBelow > spaceAbove;
@@ -81,21 +80,18 @@ const AuraTooltip: React.FC<{ effect: AnyEffect; rect: DOMRect | null }> = ({ ef
   const top = showBelow ? rect.bottom + 12 : rect.top - 12;
   const left = rect.left + (rect.width / 2) - (tooltipWidth / 2);
   
-  // Clamping to screen edges
   const clampedLeft = Math.max(10, Math.min(left, viewportWidth - tooltipWidth - 10));
   const transform = showBelow ? 'translateX(0)' : 'translateY(-100%)';
 
-  // Determine Duration Text
   let durationText = "";
   if ('duration' in effect) {
      const dur = (effect as any).duration;
-     if ('type' in effect) durationText = `${dur} Turn${dur !== 1 ? 's' : ''}`; // CombatStatusEffect
-     else durationText = `${dur} Battle${dur !== 1 ? 's' : ''}`; // ActiveEffect
+     if ('type' in effect) durationText = `${dur} Turn${dur !== 1 ? 's' : ''}`;
+     else durationText = `${dur} Battle${dur !== 1 ? 's' : ''}`;
   } else {
-     durationText = "Permanent Aura"; // Maledict
+     durationText = "Permanent Aura";
   }
 
-  // Type Guards & Labels
   const isMaledict = (e: any): e is MaledictAffix => 'statModifiers' in e;
   
   const typeLabel = isMaledict(effect) ? "Maledict Aura" : 
@@ -108,11 +104,8 @@ const AuraTooltip: React.FC<{ effect: AnyEffect; rect: DOMRect | null }> = ({ ef
         style={{ top, left: clampedLeft, width: tooltipWidth, transform }}
     >
         <div className="bg-[#151413] border-2 border-stone-500 shadow-[0_0_50px_rgba(0,0,0,0.8)] rounded-sm p-3 relative text-xs overflow-hidden">
-             {/* Background Texture */}
              <div className="absolute inset-0 bg-stone-900 opacity-90"></div>
              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/dark-leather.png')] opacity-30"></div>
-
-             {/* Arrow Indicator */}
              <div className={`absolute w-3 h-3 bg-[#151413] border-r border-b border-stone-500 transform rotate-45 left-1/2 -translate-x-1/2 z-0 ${showBelow ? '-top-1.5 border-b-0 border-r-0 border-t border-l' : '-bottom-1.5'}`}></div>
              
              <div className="relative z-10">
@@ -149,7 +142,6 @@ const AuraBadge: React.FC<{
     onLeave: () => void; 
 }> = ({ effect, onHover, onLeave }) => {
     
-    // Determine Properties based on Type
     const isCombat = (e: any): e is CombatStatusEffect => 'type' in e && 'stacks' in e;
     const isMaledict = (e: any): e is MaledictAffix => 'statModifiers' in e;
     
@@ -167,16 +159,12 @@ const AuraBadge: React.FC<{
         borderColor = isDebuff ? 'border-red-600' : 'border-blue-500';
         bgColor = isDebuff ? 'bg-red-950/60' : 'bg-blue-950/60';
     } else {
-        // Both MaledictAffix and ActiveEffect have an icon property
-        // Safe access check via type assertion for unknown property access in union
         icon = 'icon' in effect ? (effect as any).icon : '❓';
-        
         if (isMaledict(effect)) {
             borderColor = 'border-purple-500';
             bgColor = 'bg-purple-950/60';
-            badgeText = null; // Infinite
+            badgeText = null; 
         } else {
-            // ActiveEffect (Hero Buff)
             badgeText = `${(effect as ActiveEffect).duration}`;
             const isDebuff = (effect as ActiveEffect).isDebuff;
             borderColor = isDebuff ? 'border-red-600' : 'border-green-600';
@@ -186,21 +174,19 @@ const AuraBadge: React.FC<{
 
     return (
         <div 
-            className={`relative w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 border ${borderColor} ${bgColor} rounded flex items-center justify-center cursor-help transition-all duration-200 hover:scale-110 hover:shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:z-20 group aura-badge`}
+            className={`relative w-8 h-8 md:w-10 md:h-10 lg:w-12 lg:h-12 shrink-0 border ${borderColor} ${bgColor} rounded flex items-center justify-center cursor-help transition-all duration-200 hover:scale-110 hover:shadow-[0_0_15px_rgba(255,255,255,0.15)] hover:z-20 group aura-badge`}
             onMouseEnter={(e) => onHover(e, effect)}
-            onClick={(e) => onHover(e, effect)} // For mobile support
+            onClick={(e) => onHover(e, effect)}
             onMouseLeave={onLeave}
         >
             <span className="text-sm md:text-lg lg:text-xl filter drop-shadow opacity-90 group-hover:opacity-100">{icon}</span>
-            
             {badgeText && (
-                 <span className="absolute -bottom-1 -right-1 bg-black text-[9px] lg:text-[10px] text-stone-300 px-1 rounded leading-none border border-stone-800 shadow z-10 font-mono font-bold">
+                 <span className="absolute -bottom-1 -right-1 bg-black text-[8px] lg:text-[10px] text-stone-300 px-1 rounded leading-none border border-stone-800 shadow z-10 font-mono font-bold">
                     {badgeText}
                  </span>
             )}
-            
             {stackCount > 1 && (
-                <span className="absolute -top-2 -right-2 bg-amber-600 text-white text-[9px] rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center border border-black z-20 font-bold shadow-sm">
+                <span className="absolute -top-2 -right-2 bg-amber-600 text-white text-[8px] rounded-full min-w-[14px] h-3.5 px-0.5 flex items-center justify-center border border-black z-20 font-bold shadow-sm">
                     {stackCount}
                 </span>
             )}
@@ -216,20 +202,15 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
   const [enemyFloats, setEnemyFloats] = useState<FloatingNumber[]>([]);
   const prevPlayerHp = useRef(playerHp);
   const prevMonsterHp = useRef(monster.currentHp);
-  
-  // Tooltip State
   const [hoveredEffect, setHoveredEffect] = useState<{ effect: AnyEffect; rect: DOMRect } | null>(null);
 
   const handleEffectHover = (e: React.MouseEvent<HTMLDivElement>, effect: AnyEffect) => {
-      // Prevent rapid re-render if hovering same effect
       if (hoveredEffect?.effect === effect) return;
-      
       const rect = e.currentTarget.getBoundingClientRect();
       setHoveredEffect({ effect, rect });
   };
   
   const handleEffectLeave = () => {
-    // Optional: Add small delay for mouse leave if needed, but instant is standard
     setHoveredEffect(null);
   };
 
@@ -251,7 +232,6 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
     prevMonsterHp.current = monster.currentHp;
   }, [monster.currentHp]);
 
-  // Global click to close tooltip on mobile if clicking outside
   useEffect(() => {
       const handleClickOutside = (e: MouseEvent | TouchEvent) => {
           if (hoveredEffect && !(e.target as HTMLElement).closest('.aura-badge')) {
@@ -267,45 +247,45 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
   }, [hoveredEffect]);
 
   return (
-    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/60 backdrop-blur-[2px]">
-       
-       {/* Tooltip Portal Layer */}
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-sm h-[100dvh] w-[100dvw] overflow-hidden">
        {hoveredEffect && <AuraTooltip effect={hoveredEffect.effect} rect={hoveredEffect.rect} />}
 
-       {/* Battle Container - Responsive sizing */}
-       <div className="w-full h-full max-w-[90%] max-h-[90%] flex flex-col relative pointer-events-auto">
-           
-           {/* Timeline Header */}
-           <div className="h-12 lg:h-16 bg-black/80 border-b border-stone-800 flex items-center justify-center gap-2 lg:gap-3 relative">
-                <div className="text-[10px] lg:text-xs text-stone-500 uppercase font-bold mr-2 tracking-widest">Turn Order</div>
-                {turnQueue.slice(0, 15).map((actor, idx) => (
-                    <div key={idx} className={`w-6 h-6 lg:w-8 lg:h-8 rounded-full flex items-center justify-center border shadow-md transition-all ${actor === 'player' ? 'bg-stone-800 border-green-600' : 'bg-stone-900 border-red-600'} ${idx === 0 ? 'scale-125 z-10 ring-2 ring-amber-500' : 'opacity-60 scale-90'}`}>
-                        <span className="text-[10px] lg:text-xs">{actor === 'player' ? '👤' : '👹'}</span>
+       <div className="w-full h-full flex flex-col relative pointer-events-auto">
+           {/* 1. TOP BAR: Timeline & Flee */}
+           <div className="h-12 md:h-16 shrink-0 bg-stone-950/90 border-b border-stone-800 flex items-center justify-between px-2 md:px-4 relative z-20 shadow-md">
+                <div className="flex items-center gap-1 md:gap-2 overflow-hidden flex-1 mr-2">
+                    <span className="text-[10px] md:text-xs text-stone-500 font-bold uppercase hidden sm:inline tracking-wider">Turn Order</span>
+                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar mask-gradient-right pb-1">
+                        {turnQueue.slice(0, 10).map((actor, idx) => (
+                            <div key={idx} className={`shrink-0 w-6 h-6 md:w-8 md:h-8 rounded-full flex items-center justify-center border shadow-sm transition-all ${actor === 'player' ? 'bg-stone-800 border-green-600' : 'bg-stone-900 border-red-600'} ${idx === 0 ? 'ring-2 ring-amber-500 z-10' : 'opacity-70 scale-90'}`}>
+                                <span className="text-[10px] md:text-xs">{actor === 'player' ? '👤' : '👹'}</span>
+                            </div>
+                        ))}
                     </div>
-                ))}
-                <div className="absolute right-4 top-2 lg:top-4">
-                    <button onClick={onFlee} className="px-4 py-1 lg:py-2 bg-stone-800 hover:bg-red-900/80 border border-stone-600 text-stone-300 text-xs lg:text-sm uppercase font-bold rounded transition-colors button">Run Away</button>
                 </div>
+                <button onClick={onFlee} className="shrink-0 px-3 py-1.5 md:px-4 md:py-2 bg-stone-800 active:bg-red-900 border border-stone-600 text-stone-300 text-[10px] md:text-xs uppercase font-bold rounded transition-colors shadow-sm touch-manipulation">
+                    Run Away
+                </button>
            </div>
 
-           {/* Main Arena */}
-           <div className="flex-grow flex items-center justify-between px-4 md:px-12 lg:px-32 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-900/30 via-black/60 to-black/90">
+           {/* 2. BATTLE ARENA */}
+           <div className="flex-grow flex flex-col md:flex-row items-center justify-between p-2 md:p-8 relative overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-900/20 via-black/80 to-black">
                 
-                {/* HERO SIDE */}
-                <div className="flex flex-col items-center gap-4 lg:gap-6 w-1/3 lg:w-80 z-10">
-                    <div className={`w-24 h-24 md:w-40 md:h-40 lg:w-56 lg:h-56 rounded-full border-4 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative transition-all duration-500 ${isPlayerTurn ? 'border-green-600 shadow-[0_0_30px_rgba(22,163,74,0.3)] scale-105' : 'border-stone-700 grayscale-[0.3]'}`}>
+                {/* HERO SECTION - Order 3 on mobile (bottom), Order 1 on Desktop (left) */}
+                <div className="order-3 md:order-1 flex flex-row md:flex-col items-center gap-3 md:gap-6 w-full md:w-80 z-10 transition-all h-auto px-2 mb-2 md:mb-0">
+                    <div className={`shrink-0 w-20 h-20 md:w-40 md:h-40 lg:w-56 lg:h-56 rounded-full border-2 md:border-4 shadow-[0_0_20px_rgba(0,0,0,0.5)] relative transition-all duration-300 ${isPlayerTurn ? 'border-green-600 shadow-[0_0_30px_rgba(22,163,74,0.3)] scale-105' : 'border-stone-700 grayscale-[0.3]'}`}>
                         <div className="absolute inset-0 bg-black/40 rounded-full"></div>
                         <GameIcon name="hero" className="w-full h-full drop-shadow-2xl" />
                         {heroFloats.map(f => <FloatingText key={f.id} num={f} />)}
                     </div>
                     
-                    <div className="w-full space-y-2 lg:space-y-4">
+                    <div className="flex-grow w-full space-y-1 md:space-y-4 min-w-0">
                         <HealthBar current={playerHp} max={playerStats.maxHp} label="HERO" />
-                        <div className="grid grid-cols-2 gap-2 lg:gap-4">
+                        <div className="flex gap-2 justify-between">
                             <StatPlate label="Dmg" value={playerStats.damage} icon="⚔️" />
                             <StatPlate label="Arm" value={playerStats.armor} icon="🛡️" />
                         </div>
-                        <div className="flex flex-wrap justify-center gap-1.5 min-h-[40px] bg-black/20 p-2 rounded border border-white/5">
+                        <div className="flex overflow-x-auto no-scrollbar gap-1.5 min-h-[32px] md:min-h-[40px] items-center mask-gradient-right">
                             {[...combatStatusEffects.filter(e => e.target === 'player'), ...activeEffects].map((e, idx) => (
                                 <AuraBadge key={`${e.id}-${idx}`} effect={e} onHover={handleEffectHover} onLeave={handleEffectLeave} />
                             ))}
@@ -313,33 +293,34 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
                     </div>
                 </div>
 
-                {/* VS CENTER */}
-                <div className="flex flex-col items-center z-10 mx-2">
-                    <div className="text-4xl md:text-6xl lg:text-8xl diablo-font text-red-800 font-bold drop-shadow-[0_0_15px_rgba(153,27,27,0.8)] animate-pulse opacity-80">VS</div>
-                    <div className="mt-4 md:mt-8 flex gap-1 bg-black/60 p-1 rounded border border-stone-800 backdrop-blur-sm">
+                {/* CONTROLS SECTION - Order 2 (Middle) */}
+                <div className="order-2 flex flex-col items-center justify-center z-10 my-4 md:my-0 w-full md:w-auto shrink-0 flex-1">
+                     <div className="hidden md:block text-4xl lg:text-8xl diablo-font text-red-800 font-bold drop-shadow-lg opacity-50 mb-4">VS</div>
+                     <div className="flex gap-4 md:gap-2 bg-stone-900/80 p-2 rounded-full md:rounded border border-stone-700 backdrop-blur-md shadow-xl">
                         {[CombatStance.AGGRESSIVE, CombatStance.BALANCED, CombatStance.DEFENSIVE].map(s => (
-                            <button key={s} onClick={() => onSetStance(s)} className={`w-8 h-8 lg:w-12 lg:h-12 flex items-center justify-center rounded transition-all ${combatStance === s ? 'bg-stone-700 text-amber-400 border border-stone-500 shadow-inner' : 'text-stone-600 hover:text-stone-300 hover:bg-stone-800'}`}>
-                                <span className="text-sm lg:text-lg">{s === CombatStance.AGGRESSIVE ? '⚔️' : s === CombatStance.DEFENSIVE ? '🛡️' : '⚖️'}</span>
+                            <button key={s} onClick={() => onSetStance(s)} className={`w-12 h-12 md:w-12 md:h-12 flex items-center justify-center rounded-full md:rounded transition-all active:scale-95 touch-manipulation ${combatStance === s ? 'bg-stone-700 text-amber-400 border border-stone-500 shadow-[0_0_10px_rgba(251,191,36,0.2)]' : 'text-stone-600 hover:text-stone-300 hover:bg-stone-800'}`}>
+                                <span className="text-xl md:text-lg">{s === CombatStance.AGGRESSIVE ? '⚔️' : s === CombatStance.DEFENSIVE ? '🛡️' : '⚖️'}</span>
                             </button>
                         ))}
                     </div>
+                    <div className="md:hidden text-[10px] text-stone-500 font-bold uppercase mt-1 tracking-widest">Combat Stance</div>
                 </div>
 
-                {/* MONSTER SIDE */}
-                <div className="flex flex-col items-center gap-4 lg:gap-6 w-1/3 lg:w-80 z-10">
-                    <div className={`w-24 h-24 md:w-40 md:h-40 lg:w-56 lg:h-56 rounded-full border-4 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative transition-all duration-500 ${!isPlayerTurn ? `border-red-600 ${rarityConfig.glow} scale-105` : 'border-stone-700 grayscale-[0.3]'}`}>
+                {/* ENEMY SECTION - Order 1 on mobile (top), Order 3 on Desktop (right) */}
+                <div className="order-1 md:order-3 flex flex-row-reverse md:flex-col items-center gap-3 md:gap-6 w-full md:w-80 z-10 transition-all h-auto px-2 mt-2 md:mt-0">
+                    <div className={`shrink-0 w-20 h-20 md:w-40 md:h-40 lg:w-56 lg:h-56 rounded-full border-2 md:border-4 shadow-[0_0_20px_rgba(0,0,0,0.5)] relative transition-all duration-300 ${!isPlayerTurn ? `border-red-600 ${rarityConfig.glow} scale-105` : 'border-stone-700 grayscale-[0.3]'}`}>
                         <div className="absolute inset-0 bg-black/40 rounded-full"></div>
                         <GameIcon name={monster.icon} imageUrl={monster.imageUrl} className={`w-full h-full drop-shadow-2xl ${rarityConfig.color}`} />
                         {enemyFloats.map(f => <FloatingText key={f.id} num={f} />)}
                     </div>
                     
-                    <div className="w-full space-y-2 lg:space-y-4">
-                        <HealthBar current={monster.currentHp} max={monster.maxHp} isEnemy label={monster.rarity} />
-                        <div className="grid grid-cols-2 gap-2 lg:gap-4">
+                    <div className="flex-grow w-full space-y-1 md:space-y-4 min-w-0 text-right md:text-left">
+                         <HealthBar current={monster.currentHp} max={monster.maxHp} isEnemy label={monster.rarity} />
+                         <div className="flex gap-2 justify-between flex-row-reverse md:flex-row">
                             <StatPlate label="Dmg" value={monster.damage} icon="⚔️" color="text-red-400" />
                             <StatPlate label="Arm" value={monster.armor} icon="🛡️" />
                         </div>
-                        <div className="flex flex-wrap justify-center gap-1.5 min-h-[40px] bg-black/20 p-2 rounded border border-white/5">
+                        <div className="flex overflow-x-auto no-scrollbar gap-1.5 min-h-[32px] md:min-h-[40px] items-center justify-end md:justify-start mask-gradient-left md:mask-gradient-right">
                             {[...monster.maledicts, ...combatStatusEffects.filter(e => e.target === 'enemy')].map((e, idx) => (
                                 <AuraBadge key={`${e.id}-${idx}`} effect={e} onHover={handleEffectHover} onLeave={handleEffectLeave} />
                             ))}
@@ -348,9 +329,9 @@ const CombatModal: React.FC<CombatModalProps> = ({ playerStats, playerHp, monste
                 </div>
            </div>
 
-           {/* Combat Log Footer */}
-           <div className="h-16 lg:h-24 bg-black/90 border-t border-stone-800 flex items-center justify-center relative z-20">
-                <div className={`text-sm md:text-lg lg:text-2xl diablo-font tracking-wide text-center px-4 ${latestLog.includes('CRIT') ? 'text-yellow-500 animate-pulse font-bold' : 'text-stone-300'}`}>
+           {/* 3. FOOTER: Logs */}
+           <div className="h-14 md:h-24 bg-black/95 border-t border-stone-800 flex items-center justify-center shrink-0 z-20 px-4 pb-safe">
+                <div className={`text-xs md:text-lg lg:text-2xl diablo-font tracking-wide text-center line-clamp-2 md:line-clamp-1 ${latestLog.includes('CRIT') ? 'text-yellow-500 animate-pulse font-bold' : 'text-stone-300'}`}>
                     {latestLog}
                 </div>
            </div>

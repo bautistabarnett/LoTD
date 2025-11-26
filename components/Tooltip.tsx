@@ -1,6 +1,6 @@
 
-import React, { useLayoutEffect, useRef, useState } from 'react';
-import { Item } from '../types';
+import React, { useLayoutEffect, useRef, useState, useMemo } from 'react';
+import { Item, ItemStat, StatType } from '../types';
 import { RARITY_COLORS } from '../constants';
 
 interface TooltipProps {
@@ -9,43 +9,110 @@ interface TooltipProps {
   position: { x: number; y: number };
 }
 
-const ItemCard = ({ item, label, isEquipped }: { item: Item; label?: string, isEquipped?: boolean }) => {
+// Consistent sorting order for easy visual comparison
+const STAT_ORDER: StatType[] = [
+    StatType.DAMAGE,
+    StatType.ARMOR,
+    StatType.STRENGTH,
+    StatType.DEXTERITY,
+    StatType.INTELLIGENCE,
+    StatType.VITALITY,
+    StatType.CRIT_CHANCE,
+    StatType.ATTACK_SPEED,
+    StatType.LIFE_STEAL,
+    StatType.DODGE_CHANCE,
+    StatType.MAGIC_FIND,
+    StatType.THORNS
+];
+
+const getStatDiff = (stat: ItemStat, comparedItem?: Item) => {
+    if (!comparedItem) return <span className="text-green-500 text-[10px] ml-1 font-mono">(New)</span>;
+    
+    // Find matching stat on the equipped item
+    const match = comparedItem.stats.find(s => s.type === stat.type);
+    
+    // If equipped doesn't have it, it's a pure gain
+    if (!match) return <span className="text-green-500 text-[10px] ml-1 font-mono">(+{stat.value})</span>;
+    
+    const diff = stat.value - match.value;
+    if (diff > 0) return <span className="text-green-500 text-[10px] ml-1 font-mono">(+{diff})</span>;
+    if (diff < 0) return <span className="text-red-500 text-[10px] ml-1 font-mono">({diff})</span>;
+    
+    return <span className="text-stone-600 text-[10px] ml-1 font-mono">(=)</span>;
+};
+
+const ItemCard = ({ 
+    item, 
+    label, 
+    isEquipped, 
+    comparedItem 
+}: { 
+    item: Item; 
+    label?: string; 
+    isEquipped?: boolean; 
+    comparedItem?: Item; // Only passed to the inspecting item to calculate diffs
+}) => {
   const textColor = RARITY_COLORS[item.rarity];
   
   let borderColor = 'border-stone-600';
-  let bgGradient = 'from-stone-900 to-black';
+  let bgGradient = 'from-[#1c1917] to-black'; // Default Dark
   let labelColor = 'bg-stone-800 text-stone-400 border-stone-600';
+  let shadowColor = 'shadow-[0_0_30px_rgba(0,0,0,0.8)]';
 
   if (isEquipped) {
-      borderColor = 'border-stone-500'; // Muted border for equipped
-      bgGradient = 'from-stone-950 to-black';
-      labelColor = 'bg-stone-800 text-stone-400 border-stone-600';
+      borderColor = 'border-stone-500'; 
+      bgGradient = 'from-[#292524] to-black'; // Slightly lighter/warm for equipped
+      labelColor = 'bg-stone-700 text-stone-300 border-stone-500';
+      shadowColor = 'shadow-[0_0_20px_rgba(0,0,0,0.6)]'; // Softer shadow for background card
   } else {
-      if (item.rarity === 'Magic') borderColor = 'border-blue-800';
-      if (item.rarity === 'Rare') borderColor = 'border-yellow-700';
-      if (item.rarity === 'Unique') borderColor = 'border-amber-600';
+      // Rarity Styling for Inspection Card
+      if (item.rarity === 'Magic') { 
+          borderColor = 'border-blue-800'; 
+          bgGradient = 'from-blue-950/20 to-black'; 
+          shadowColor = 'shadow-[0_0_30px_rgba(30,64,175,0.3)]';
+      }
+      if (item.rarity === 'Rare') { 
+          borderColor = 'border-yellow-700'; 
+          bgGradient = 'from-yellow-950/20 to-black'; 
+          shadowColor = 'shadow-[0_0_30px_rgba(234,179,8,0.3)]';
+      }
+      if (item.rarity === 'Unique') { 
+          borderColor = 'border-amber-600'; 
+          bgGradient = 'from-amber-950/20 to-black'; 
+          shadowColor = 'shadow-[0_0_40px_rgba(217,119,6,0.4)]';
+      }
       
-      // Highlight "New" or "Inspecting"
       if (label === 'Inspecting' || label === 'New') {
           labelColor = 'bg-green-900 text-green-300 border-green-700';
       }
   }
+
+  // Memoized Sort to ensure stable render order
+  const sortedStats = useMemo(() => {
+      return [...item.stats].sort((a, b) => {
+          let idxA = STAT_ORDER.indexOf(a.type);
+          let idxB = STAT_ORDER.indexOf(b.type);
+          // Put unknown stats at the end
+          if (idxA === -1) idxA = 99;
+          if (idxB === -1) idxB = 99;
+          return idxA - idxB;
+      });
+  }, [item.stats]);
 
   return (
     <div className={`
         w-72 md:w-80 
         bg-[#0a0a0a]/95 
         border-2 ${borderColor} 
-        p-0 
-        shadow-[0_0_30px_rgba(0,0,0,0.8)] 
+        ${shadowColor}
         rounded-sm 
         text-sm 
         relative 
         shrink-0 
         flex flex-col 
         tooltip-card
-        transition-transform
-        ${isEquipped ? 'opacity-90 scale-[0.98] origin-top' : 'z-10'}
+        transition-all
+        ${isEquipped ? 'z-0 opacity-95' : 'z-10'}
     `}>
       {/* Background Texture */}
       <div className="absolute inset-0 bg-texture-noise opacity-10 pointer-events-none"></div>
@@ -65,20 +132,29 @@ const ItemCard = ({ item, label, isEquipped }: { item: Item; label?: string, isE
           </p>
       </div>
 
-      {/* Content - Scrollable if content itself is massive, though outer container handles main scroll */}
+      {/* Content */}
       <div className="p-4 space-y-3 relative">
         <div className="space-y-1">
-          {item.stats.map((stat, idx) => (
-            <div key={idx} className="flex justify-between text-stone-300 font-serif text-[15px]">
+          {sortedStats.map((stat, idx) => (
+            <div key={idx} className="flex justify-between items-center text-stone-300 font-serif text-[15px]">
               <span className="text-stone-400">{stat.type}</span>
-              <span className={`font-bold ${
-                  stat.type === 'Damage' ? 'text-red-400' : 
-                  stat.type === 'Armor' ? 'text-stone-200' :
-                  stat.type === 'Magic Find' ? 'text-yellow-400' :
-                  'text-blue-200'
-              }`}>+{stat.value}{stat.type.includes('Chance') || stat.type.includes('Steal') ? '%' : ''}</span>
+              <div className="flex items-center">
+                  {/* Show diff calculation only on the inspecting card */}
+                  {!isEquipped && comparedItem && getStatDiff(stat, comparedItem)}
+                  
+                  <span className={`font-bold ml-2 ${
+                      stat.type === 'Damage' ? 'text-red-400' : 
+                      stat.type === 'Armor' ? 'text-stone-200' :
+                      stat.type === 'Magic Find' ? 'text-yellow-400' :
+                      'text-blue-200'
+                  }`}>+{stat.value}{stat.type.includes('Chance') || stat.type.includes('Steal') ? '%' : ''}</span>
+              </div>
             </div>
           ))}
+          
+          {sortedStats.length === 0 && (
+              <div className="text-center text-stone-600 italic text-xs py-2">No stats</div>
+          )}
         </div>
 
         {!item.isIdentified && (
@@ -133,7 +209,7 @@ const Tooltip: React.FC<TooltipProps> = ({ item, comparedItem, position }) => {
             left: '50%',
             transform: 'translate(-50%, -50%)',
             opacity: 1,
-            maxHeight: '85vh',
+            maxHeight: '80vh', // Safe area buffer
             maxWidth: '95vw',
             overflowY: 'auto', // Enable scrolling within the tooltip container
             zIndex: 100,
@@ -143,32 +219,37 @@ const Tooltip: React.FC<TooltipProps> = ({ item, comparedItem, position }) => {
             gap: '16px',
             padding: '10px',
             // Backdrop blur to focus attention
-            backdropFilter: 'blur(2px)',
-            borderRadius: '8px'
+            backdropFilter: 'blur(4px)',
+            backgroundColor: 'rgba(0,0,0,0.6)',
+            borderRadius: '8px',
+            boxShadow: '0 4px 30px rgba(0, 0, 0, 0.5)'
         });
     } else {
-        // --- DESKTOP LAYOUT: Follow Cursor ---
-        // Side-by-side, fixed to cursor position but constrained to viewport
+        // --- DESKTOP LAYOUT: Follow Cursor with Comparison Logic ---
         const padding = 15;
         const offset = 20;
+        
         let x = position.x + offset;
         let y = position.y + offset;
-
+        
         // Smart Flip Horizontal
+        // If x + width > viewport, flip to left of cursor
         if (x + rect.width > vw - padding) {
             x = position.x - rect.width - offset;
         }
-        // Clamp Horizontal
-        if (x < padding) x = padding;
-        if (x + rect.width > vw) x = vw - rect.width - padding; // Hard clamp right
-
+        
         // Smart Flip Vertical
+        // If y + height > viewport, flip to above cursor
         if (y + rect.height > vh - padding) {
             y = position.y - rect.height - offset;
         }
-        // Clamp Vertical
+
+        // Hard Clamping to prevent off-screen
+        if (x < padding) x = padding;
+        if (x + rect.width > vw - padding) x = vw - rect.width - padding;
+        
         if (y < padding) y = padding;
-        if (y + rect.height > vh) y = vh - rect.height - padding; // Hard clamp bottom
+        if (y + rect.height > vh - padding) y = vh - rect.height - padding;
 
         setStyle({
             position: 'fixed',
@@ -176,10 +257,13 @@ const Tooltip: React.FC<TooltipProps> = ({ item, comparedItem, position }) => {
             left: x,
             opacity: 1,
             zIndex: 100,
-            pointerEvents: 'none', // Allow clicking through on desktop (standard tooltip behavior)
+            pointerEvents: 'none', // Allow clicking through on desktop
             display: 'flex',
-            flexDirection: 'row', // Side by side
-            gap: '8px'
+            flexDirection: 'row', // Side-by-side
+            alignItems: 'flex-start',
+            gap: '12px', // Nice gap between cards
+            maxWidth: 'none', // Allow full width for two cards
+            maxHeight: 'none'
         });
     }
 
@@ -191,11 +275,22 @@ const Tooltip: React.FC<TooltipProps> = ({ item, comparedItem, position }) => {
       className="tooltip-container transition-opacity duration-150 ease-out"
       style={style}
     >
-      {/* Show the hovered item (New) first/left/top */}
-      <ItemCard item={item} label={comparison ? "Inspecting" : undefined} />
+      {/* Inspecting Item (Left/Top) */}
+      {/* Pass comparison item so we can calculate diffs */}
+      <ItemCard 
+        item={item} 
+        label={comparison ? "Inspecting" : undefined} 
+        comparedItem={comparison} 
+      />
       
-      {/* Show the equipped item (Comparison) second/right/bottom */}
-      {comparison && <ItemCard item={comparison} label="Equipped" isEquipped />}
+      {/* Equipped Item (Right/Bottom) */}
+      {comparison && (
+          <ItemCard 
+            item={comparison} 
+            label="Equipped" 
+            isEquipped 
+          />
+      )}
     </div>
   );
 };
